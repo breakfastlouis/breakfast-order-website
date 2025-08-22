@@ -16,7 +16,6 @@
     <h1 class="text-3xl font-extrabold text-blue-900 mb-6 text-center tracking-wide">
       路易士早餐吧
     </h1>
-
     <div v-if="loading">🍳 菜單載入中...</div>
 
     <div v-else>
@@ -55,7 +54,6 @@
         ✅ 送出訂單
       </button>
     </div>
-
     <!-- 購物車浮動按鈕 -->
     <button @click="toggleCartPanel"
       class="fixed bottom-6 right-6 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition z-50 relative"
@@ -75,75 +73,3 @@
       </span>
     </button>
 
-    <!-- 訂單送出後提示 -->
-    <div v-if="orderSubmitted" class="mt-6 text-blue-700 font-semibold text-center">
-      訂單已送出！編號：{{ lastOrderId }}，桌號：{{ lastTableNumber }}，感謝您的點餐 🙌
-    </div>
-  </div>
-
-  <script>
-    // Firebase 初始化
-    const firebaseConfig = {
-      apiKey: "AIzaSyAEpf1ffQFht5yBm-xCBBMVsdxjzbVhsBg",
-      authDomain: "louis-breakfast-tpe.firebaseapp.com",
-      projectId: "louis-breakfast-tpe",
-      storageBucket: "louis-breakfast-tpe.appspot.com",
-      messagingSenderId: "707080689547",
-      appId: "1:707080689547:web:ca293380046a59e7de818e",
-      measurementId: "G-P4FXJC40KP"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    const { createApp } = Vue;
-
-    createApp({
-      data() {
-        return {
-          menu: [],
-          cart: [],
-          tableNumber: '',
-          lastTableNumber: '',
-          lastOrderId: '',
-          orderCounter: 1,
-          showCartPanel: false,
-          orderSubmitted: false,
-          loading: true
-        };
-      },
-      computed: {
-        total() {
-          return this.cart.reduce((sum, item) => sum + Number(item.price), 0);
-        },
-        sortedMenu() {
-          return this.menu
-            .filter(item => item.available !== false)
-            .sort((a, b) => a.id.localeCompare(b.id, 'zh-Hant', { numeric: true }));
-        }
-      },
-      methods: {
-        addToCart(item) {
-          this.cart.push(item);
-        },
-        removeFromCart(index) {
-          this.cart.splice(index, 1);
-        },
-        toggleCartPanel() {
-          this.showCartPanel = !this.showCartPanel;
-        },
-        submitOrder() {
-          const today = new Date();
-          const yyyy = today.getFullYear();
-          const mm = String(today.getMonth() + 1).padStart(2, '0');
-          const dd = String(today.getDate()).padStart(2, '0');
-          const dateStr = `${yyyy}${mm}${dd}`;
-          const serial = String(this.orderCounter).padStart(4, '0');
-          this.lastOrderId = `${dateStr}${serial}`;
-          this.lastTableNumber = this.tableNumber;
-
-          console.log("訂單編號：", this.lastOrderId);
-          console.log("桌號：", this.lastTableNumber);
-          console.log("訂單內容：", this.cart);
-
-          this.orderCounter++;
-         
