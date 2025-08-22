@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>路易士早餐吧</title>
   <script src="https://cdn.jsdelivr.net/npm/vue@3.4.15/dist/vue.global.prod.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>body { font-family: 'Noto Sans TC', sans-serif; }</style>
 </head>
 <body class="bg-blue-50">
@@ -36,7 +36,26 @@
       <div v-if="cart.length === 0">目前尚未選擇品項</div>
       <ul>
         <li v-for="(item, index) in cart" :key="index" class="mb-2">
-              <!-- 購物車浮動按鈕 -->
+          {{ item.id }}. {{ item.name }} - NT$ {{ item.price }}
+          <button @click="removeFromCart(index)" class="ml-2 text-red-500">移除</button>
+        </li>
+      </ul>
+
+      <!-- 桌號輸入欄位 -->
+      <div class="mt-4">
+        <label for="table" class="block text-sm font-medium text-gray-700">桌號</label>
+        <input id="table" v-model="tableNumber" type="text"
+          placeholder="例如：A1、5號桌"
+          class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+      </div>
+
+      <div class="mt-2 font-bold">總金額：NT$ {{ total }}</div>
+      <button @click="submitOrder"
+        class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded w-full">
+        ✅ 送出訂單
+      </button>
+    </div>
+    <!-- 購物車浮動按鈕 -->
     <button @click="toggleCartPanel"
       class="fixed bottom-6 right-6 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition z-50 relative"
       aria-label="購物車">
@@ -158,4 +177,3 @@
   </script>
 </body>
 </html>
-
