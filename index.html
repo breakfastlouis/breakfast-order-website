@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>路易士早餐吧</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center">
+
+    <div class="container mx-auto px-4 py-8 max-w-4xl w-full">
+        <!-- Header Section -->
+        <header class="text-center mb-8">
+            <h1 id="main-title" class="text-6xl md:text-7xl font-black text-blue-400 tracking-tight leading-none mb-2 rounded-xl p-4 bg-white shadow-lg">
+                路易士早餐吧
+            </h1>
+            <!-- 原來的副標題已移除 -->
+        </header>
+
+        <!-- Menu Section -->
+        <main class="space-y-6">
+            <h2 id="menu-title" class="text-3xl font-bold text-gray-800 mb-4 text-center">菜單</h2>
+            <div id="loading-spinner" class="text-center p-8">
+                <i class="fas fa-spinner fa-spin text-4xl text-blue-500"></i>
+                <p id="loading-text" class="mt-2 text-gray-500">載入中，請稍候...</p>
+            </div>
+            <div id="menu-container" class="space-y-6">
+                <!-- Menu items will be dynamically loaded here -->
+            </div>
+        </main>
+
+        <!-- Floating Cart Button -->
+        <div id="cart-button" class="fixed bottom-4 right-4 z-50">
+            <button onclick="toggleCartModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-full shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-300">
+                <i class="fas fa-shopping-cart text-xl"></i>
+                <span id="cart-count" class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full transform translate-x-1/2 -translate-y-1/2">0</span>
+            </button>
+        </div>
+
+        <!-- Cart Modal -->
+        <div id="cart-modal" class="fixed inset-0 z-50 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden">
+            <div class="bg-white rounded-2xl shadow-xl p-6 m-4 max-w-lg w-full transform transition-all scale-95 md:scale-100">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="cart-modal-title" class="text-2xl font-bold text-gray-800">您的訂單</h3>
+                    <button onclick="toggleCartModal()" class="text-gray-500 hover:text-gray-700 text-3xl">&times;</button>
+                </div>
+                <div id="cart-items" class="max-h-80 overflow-y-auto mb-4 border-t border-b border-gray-200 py-4">
+                    <!-- Cart items will be displayed here -->
+                </div>
+                <div class="flex justify-between items-center text-lg font-bold mb-4">
+                    <span id="total-text">總計：</span>
+                    <span id="total-price">NT$ 0</span>
+                </div>
+                <button id="submit-button" onclick="submitOrder()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-green-300">
+                    送出訂單（複製文字）
+                </button>
+                <!-- Message Box -->
+                <div id="message-box" class="mt-4 p-4 text-sm text-green-700 bg-green-100 rounded-lg hidden" role="alert">
+                    <div class="flex items-center">
+                      <i class="fas fa-check-circle mr-2"></i>
+                      <span id="message-text"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 在這裡貼上您的 Google 試算表 ID
+        const SPREADSHEET_ID = '2PACX-1vSY9jYXsiVKjhSS5jp05I4yw_WlHP-4EpHO0dnjQncnLEdt43WB0nC-bDW--ipraJEEKEqHoabbfKX1';
+        const VERSION = '1.0.16'; // 更新版本號來避免快取問題
+        const SHEET_URL = `https://docs.google.com/spreadsheets/d/e/${SPREADSHEET_ID}/pub?output=csv&v=${VERSION}`;
+
+        const menuContainer = document.getElementById('menu-container');
+        const cartItemsContainer = document.getElementById('cart-items');
+        const totalPriceEl = document.getElementById('total-price');
+        const cartCountEl = document.getElementById('cart-count');
+        const cartModal = document.getElementById('cart-modal');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+
+        let cart = {};
+        let menuData = [];
+
+        // 所有靜態文字都使用中文
+        const staticText = {
+            'emptyCart': '購物車是空的',
+            'cartEmptyMsg': '購物車是空的，無法送出訂單',
+            'copySuccessMsg': '訂單內容已複製！請貼到 LINE 或其他通訊軟體',
+            'orderPrefix': '我的早餐訂單：\n',
+            'totalPrefix': '\n總計：',
+            'errorTitle': '載入菜單失敗',
+            'errorMsgPrefix': '發生錯誤：',
+            'errorInstructions': '請按照以下步驟操作：',
+            'errorStep1': '確認您的 Google 試算表網址正確，並在網址中包含 **gid** 參數。',
+            'errorStep2': '點選頂部選單的 **檔案 > 共用 > 發布到網路**。',
+            'errorStep3': '在彈出的視窗中，確認整個文件已被發布，然後點擊 **「發布」**。',
+            'errorStep4': '完成後，回到此頁面並重新整理。',
+            'errorStep5': '如果問題仍然存在，請確認您的試算表第一列標題為「類別」、「品項」、「價格」。'
+        };
+
+        /**
+         * 顯示臨時訊息框。
+         * @param {string} textKey 靜態文字字典中的鍵值。
+         */
+        function showMessage(textKey) {
+            const text = staticText[textKey];
+            messageText.textContent = text;
+            messageBox.classList.remove('hidden');
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 3000);
+        }
+
+        /**
+         * 切換購物車彈出視窗的顯示狀態。
+         */
+        function toggleCartModal() {
+            updateCartModal();
+            cartModal.classList.toggle('hidden');
+        }
+
+        /**
+         * 更新購物車彈出視窗的內容和總價。
+         */
+        function updateCartModal() {
+            cartItemsContainer.innerHTML = '';
+            let total = 0;
+            const itemsInCart = Object.values(cart).filter(item => item.quantity > 0);
+
+            if (itemsInCart.length === 0) {
+                cartItemsContainer.innerHTML = `<p class="text-center text-gray-500">${staticText.emptyCart}</p>`;
+            } else {
+                itemsInCart.forEach(item => {
+                    const itemTotal = item.quantity * item.price;
+                    total += itemTotal;
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'flex justify-between items-center py-2 border-b last:border-b-0';
+                    itemEl.innerHTML = `
+                        <div class="flex items-center">
+                            <span class="text-gray-800 font-bold">${item.name}</span>
+                            <span class="text-sm text-gray-500 ml-2">x ${item.quantity}</span>
+                        </div>
+                        <span class="text-gray-700">NT$ ${itemTotal}</span>
+                    `;
+                    cartItemsContainer.appendChild(itemEl);
+                });
+            }
+            totalPriceEl.textContent = `NT$ ${total}`;
+        }
+
+        /**
+         * 將品項加入或從購物車中移除。
+         * @param {string} originalName 品項的原始中文名稱。
+         * @param {string} action 'add' 或 'subtract'。
+         */
+        function handleCartAction(originalName, action) {
+            const item = Object.values(menuData).flatMap(category => category).find(i => i.name === originalName);
+
+            if (!item) {
+                console.error(`原始名稱為 "${originalName}" 的品項未找到。`);
+                return;
+            }
+
+            if (!cart[originalName]) {
+                cart[originalName] = { name: item.name, price: item.price, quantity: 0 };
+            }
+
+            if (action === 'add') {
+                cart[originalName].quantity++;
+            } else if (action === 'subtract') {
+                if (cart[originalName].quantity > 0) {
+                    cart[originalName].quantity--;
+                }
+            }
+            
+            // 直接渲染中文菜單
+            renderMenu(menuData);
+
+            const totalCount = Object.values(cart).reduce((acc, item) => acc + item.quantity, 0);
+            cartCountEl.textContent = totalCount;
+            if (totalCount > 0) {
+                cartCountEl.classList.remove('hidden');
+            } else {
+                cartCountEl.classList.add('hidden');
+            }
+        }
+
+        /**
+         * 生成訂單摘要並複製到剪貼簿。
+         */
+        function submitOrder() {
+            const itemsInCart = Object.values(cart).filter(item => item.quantity > 0);
+            if (itemsInCart.length === 0) {
+                showMessage('cartEmptyMsg');
+                return;
+            }
+
+            let orderText = staticText.orderPrefix;
+            let total = 0;
+            itemsInCart.forEach(item => {
+                orderText += `- ${item.name} x ${item.quantity} (NT$ ${item.quantity * item.price})\n`;
+                total += item.quantity * item.price;
+            });
+            orderText += `${staticText.totalPrefix}NT$ ${total}`;
+
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = orderText;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            toggleCartModal();
+            showMessage('copySuccessMsg');
+
+            cart = {};
+            cartCountEl.textContent = '0';
+        }
+
+        /**
+         * 從 Google 試算表獲取並顯示菜單。
+         */
+        async function fetchMenu() {
+            loadingSpinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch(SHEET_URL);
+                if (!response.ok) {
+                    throw new Error(`${staticText.errorMsgPrefix}網路連線錯誤，無法載入菜單。狀態碼：${response.status}`);
+                }
+                const csvText = await response.text();
+
+                const rows = csvText.trim().split('\n').slice(1);
+                const categorizedMenu = {};
+
+                rows.forEach(row => {
+                    const cols = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+                    if (!cols || cols.length < 3) {
+                        return;
+                    }
+
+                    const category = cols[0].trim().replace(/^"|"$/g, '');
+                    const name = cols[1].trim().replace(/^"|"$/g, '');
+                    const price = parseFloat(cols[2].trim().replace(/^"|"$/g, ''));
+
+                    if (name && !isNaN(price)) {
+                        if (!categorizedMenu[category]) {
+                            categorizedMenu[category] = [];
+                        }
+                        categorizedMenu[category].push({ name, price });
+                    }
+                });
+                
+                menuData = categorizedMenu;
+                renderMenu(menuData);
+                
+            } catch (error) {
+                console.error('載入菜單時發生錯誤:', error);
+                menuContainer.innerHTML = `
+                    <div class="text-center p-8 bg-red-100 text-red-700 rounded-lg shadow-inner">
+                        <h3 class="text-xl font-bold">${staticText.errorTitle}</h3>
+                        <p class="mt-2 text-red-600">${staticText.errorMsgPrefix} 無法載入菜單。請稍後再試。</p>
+                        <p class="mt-4 font-bold">${staticText.errorInstructions}</p>
+                        <ul class="text-left list-disc list-inside mt-2 space-y-2">
+                            <li>${staticText.errorStep1}</li>
+                            <li>${staticText.errorStep2}</li>
+                            <li>${staticText.errorStep3}</li>
+                            <li>${staticText.errorStep4}</li>
+                            <li>${staticText.errorStep5}</li>
+                        </ul>
+                    </div>
+                `;
+            } finally {
+                loadingSpinner.classList.add('hidden');
+            }
+        }
+
+        /**
+         * 將菜單資料渲染到 HTML 頁面上。
+         * @param {object} categorizedMenu 包含菜單資料的物件。
+         */
+        function renderMenu(categorizedMenu) {
+            menuContainer.innerHTML = '';
+            for (const category in categorizedMenu) {
+                const categorySection = document.createElement('section');
+                categorySection.className = 'bg-white p-6 rounded-2xl shadow-lg transition-transform hover:shadow-xl hover:scale-[1.01]';
+                
+                const categoryTitle = document.createElement('h3');
+                categoryTitle.className = 'text-2xl font-bold text-gray-900 mb-4 border-b-2 border-blue-400 pb-2';
+                categoryTitle.textContent = category;
+                categorySection.appendChild(categoryTitle);
+
+                const menuList = document.createElement('div');
+                menuList.className = 'space-y-4';
+                
+                categorizedMenu[category].forEach(item => {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer border border-gray-200';
+                    itemEl.innerHTML = `
+                        <div>
+                            <p class="font-semibold text-gray-800 text-lg">${item.name}</p>
+                            <p class="text-gray-600">NT$ ${item.price}</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="handleCartAction('${item.name}', 'subtract')" class="text-blue-500 hover:text-blue-700 font-bold text-xl px-2 py-1 rounded-full border border-blue-500 hover:border-blue-700 transition-colors">-</button>
+                            <span id="quantity-${item.name.replace(/\s/g, '-')}" class="text-lg font-bold w-6 text-center">${cart[item.name]?.quantity || 0}</span>
+                            <button onclick="handleCartAction('${item.name}', 'add')" class="text-blue-500 hover:text-blue-700 font-bold text-xl px-2 py-1 rounded-full border border-blue-500 hover:border-blue-700 transition-colors">+</button>
+                        </div>
+                    `;
+                    menuList.appendChild(itemEl);
+                });
+                
+                categorySection.appendChild(menuList);
+                menuContainer.appendChild(categorySection);
+            }
+        }
+        
+        // 頁面載入時獲取菜單
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchMenu();
+        });
+    </script>
+</body>
+</html>
