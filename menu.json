@@ -1,0 +1,13 @@
+[
+  { "id": "A", "category": "套餐", "name": "漢堡肉芝士蛋堡+紅茶", "price": 70 },
+  { "id": "B", "category": "套餐", "name": "火腿芝士蛋吐司+紅茶", "price": 60 },
+  { "id": "C", "category": "套餐", "name": "鮪魚芝士蛋堡+紅茶", "price": 70 },
+  { "id": "1", "category": "套餐", "name": "檸檬雞蛋吐司+紅茶", "price": 65 },
+  { "id": "2", "category": "套餐", "name": "火腿蛋潛艇堡+紅茶", "price": 70 },
+  { "id": "3", "category": "套餐", "name": "香酥雞柳蛋堡+紅茶", "price": 80 },
+  { "id": "4", "category": "套餐", "name": "勁辣雞腿蛋堡+紅茶", "price": 85 },
+  { "id": "5", "category": "套餐", "name": "薯餅+熱狗*3+紅茶", "price": 55 },
+  { "id": "6", "category": "套餐", "name": "鮪魚玉米芝士蛋餅+紅茶", "price": 65 },
+  { "id": "7", "category": "套餐", "name": "火腿芝士河粉+紅茶", "price": 55 },
+  { "id": "8", "category": "套餐", "name": "花枝/蝦排總匯+紅茶", "price": 85 }
+]
