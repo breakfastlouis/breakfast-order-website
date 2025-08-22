@@ -16,24 +16,25 @@
     <div id="menu" class="space-y-4"></div>
   </div>
 
- <button id="cartBtn"
-  class="fixed bottom-20 right-6 bg-blue-600 hover:bg-blue-700 text-white w-14 h-14 rounded-full shadow-lg z-[99] flex items-center justify-center">
-  🛒
-  <span id="cartCount"
-    class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1">0</span>
-</button>
+  <!-- 購物車按鈕 -->
+  <button id="cartBtn"
+    class="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white w-14 h-14 rounded-full shadow-lg z-50 flex items-center justify-center">
+    🛒 <span id="cartCount" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1">0</span>
+  </button>
 
-  <!-- 購物車面板 -->
-  <div id="cartPanel"
-    class="fixed bottom-20 right-4 w-[90vw] max-w-sm bg-white shadow-xl rounded-lg p-4 z-50 hidden max-h-[70vh] overflow-y-auto border border-blue-200">
-    <h2 class="text-xl font-bold mb-2">🛒 購物車</h2>
-    <ul id="cartList" class="mb-2"></ul>
-    <input id="tableInput" type="text" placeholder="桌號（如 A1）"
-      class="w-full mb-2 px-3 py-2 border rounded focus:outline-none focus:ring focus:border-blue-300" />
-    <div class="font-bold mb-2">總金額：NT$ <span id="cartTotal">0</span></div>
-    <button id="submitOrder"
-      class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full">✅ 送出訂單</button>
-    <div id="orderMsg" class="mt-2 text-blue-700 font-semibold text-center hidden"></div>
+  <!-- 中央購物車面板 -->
+  <div id="cartOverlay"
+    class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
+    <div class="bg-white w-[90vw] max-w-sm rounded-lg p-4 shadow-xl max-h-[80vh] overflow-y-auto">
+      <h2 class="text-xl font-bold mb-2">🛒 購物車</h2>
+      <ul id="cartList" class="mb-2"></ul>
+      <input id="tableInput" type="text" placeholder="桌號（如 A1）"
+        class="w-full mb-2 px-3 py-2 border rounded focus:outline-none focus:ring focus:border-blue-300" />
+      <div class="font-bold mb-2">總金額：NT$ <span id="cartTotal">0</span></div>
+      <button id="submitOrder"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full">✅ 送出訂單</button>
+      <div id="orderMsg" class="mt-2 text-blue-700 font-semibold text-center hidden"></div>
+    </div>
   </div>
 
   <script>
@@ -50,94 +51,8 @@
 
     const menuEl = document.getElementById("menu");
     const cartBtn = document.getElementById("cartBtn");
-    const cartPanel = document.getElementById("cartPanel");
+    const cartOverlay = document.getElementById("cartOverlay");
     const cartList = document.getElementById("cartList");
     const cartCount = document.getElementById("cartCount");
     const cartTotal = document.getElementById("cartTotal");
-    const tableInput = document.getElementById("tableInput");
-    const submitOrder = document.getElementById("submitOrder");
-    const orderMsg = document.getElementById("orderMsg");
-
-    let cart = [];
-
-    function renderMenu(items) {
-      menuEl.innerHTML = "";
-      items.forEach(item => {
-        const div = document.createElement("div");
-        div.className = "bg-white p-4 rounded-lg shadow";
-        div.innerHTML = `
-          <div class="text-lg font-semibold text-gray-800">${item.id}. ${item.name}</div>
-          <div class="text-sm text-gray-500">NT$ ${item.price}</div>
-          <button class="mt-3 bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded-full">加入購物車</button>
-        `;
-        div.querySelector("button").onclick = () => addToCart(item);
-        menuEl.appendChild(div);
-      });
-    }
-
-    function addToCart(item) {
-      cart.push(item);
-      updateCart();
-    }
-
-    function removeFromCart(index) {
-      cart.splice(index, 1);
-      updateCart();
-    }
-
-    function updateCart() {
-      cartList.innerHTML = "";
-      cart.forEach((item, i) => {
-        const li = document.createElement("li");
-        li.className = "mb-2 flex justify-between items-center";
-        li.innerHTML = `<span>${item.id}. ${item.name} - NT$ ${item.price}</span>
-          <button class="text-red-500 text-sm">移除</button>`;
-        li.querySelector("button").onclick = () => removeFromCart(i);
-        cartList.appendChild(li);
-      });
-      cartCount.textContent = cart.length;
-      cartTotal.textContent = cart.reduce((sum, item) => sum + Number(item.price), 0);
-    }
-
-    cartBtn.onclick = () => {
-      cartPanel.classList.toggle("hidden");
-    };
-
-    submitOrder.onclick = async () => {
-      const tableNumber = tableInput.value.trim();
-      if (!tableNumber || cart.length === 0) return alert("請輸入桌號並選擇品項");
-
-      const now = new Date();
-      const orderId = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getTime()).slice(-4)}`;
-
-      const payload = {
-        orderId,
-        tableNumber,
-        items: cart.map(item => ({ id: item.id, name: item.name, price: item.price, qty: 1 })),
-        total: cart.reduce((sum, item) => sum + Number(item.price), 0),
-        status: "處理中",
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-
-      try {
-        await db.collection("orders").add(payload);
-        cart = [];
-        updateCart();
-        tableInput.value = "";
-        cartPanel.classList.add("hidden");
-        orderMsg.textContent = `訂單已送出！編號：${orderId}，桌號：${tableNumber}`;
-        orderMsg.classList.remove("hidden");
-      } catch (e) {
-        console.error("送出失敗", e);
-        alert("送出失敗，請稍後再試");
-      }
-    };
-
-    db.collection("menu").orderBy("id").onSnapshot(snap => {
-      const items = snap.docs.map(doc => doc.data()).filter(item => item.available !== false);
-      renderMenu(items);
-    });
-  </script>
-</body>
-</html>
-
+    const tableInput = document.getElement
