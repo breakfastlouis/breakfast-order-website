@@ -27,7 +27,6 @@
             <h1 id="main-title" class="text-6xl md:text-7xl font-black text-blue-400 tracking-tight leading-none mb-2 rounded-xl p-4 bg-white shadow-lg">
                 路易士早餐吧
             </h1>
-            <!-- 原來的副標題已移除 -->
         </header>
 
         <!-- Menu Section -->
@@ -57,6 +56,11 @@
                     <h3 id="cart-modal-title" class="text-2xl font-bold text-gray-800">您的訂單</h3>
                     <button onclick="toggleCartModal()" class="text-gray-500 hover:text-gray-700 text-3xl">&times;</button>
                 </div>
+                <!-- Customer info input -->
+                <div class="mb-4">
+                    <label for="customer-name" class="block text-gray-700 font-bold mb-1">您的姓名:</label>
+                    <input type="text" id="customer-name" placeholder="請輸入您的姓名" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
                 <div id="cart-items" class="max-h-80 overflow-y-auto mb-4 border-t border-b border-gray-200 py-4">
                     <!-- Cart items will be displayed here -->
                 </div>
@@ -65,44 +69,41 @@
                     <span id="total-price">NT$ 0</span>
                 </div>
                 <button id="submit-button" onclick="submitOrder()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-green-300">
-                    送出訂單（複製文字）
+                    送出訂單
                 </button>
-                <!-- Message Box -->
-                <div id="message-box" class="mt-4 p-4 text-sm text-green-700 bg-green-100 rounded-lg hidden" role="alert">
-                    <div class="flex items-center">
-                      <i class="fas fa-check-circle mr-2"></i>
-                      <span id="message-text"></span>
-                    </div>
-                </div>
+            </div>
+        </div>
+
+        <!-- Message Modal -->
+        <div id="message-modal" class="fixed inset-0 z-50 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden">
+            <div class="bg-white rounded-2xl shadow-xl p-6 m-4 max-w-sm w-full text-center">
+                <h3 id="message-title" class="text-2xl font-bold mb-2"></h3>
+                <p id="message-text" class="text-gray-700 mb-4"></p>
+                <button onclick="hideMessage()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">好的</button>
             </div>
         </div>
     </div>
 
-    <script>
-        // 在這裡貼上您的 Google 試算表 ID
-        const SPREADSHEET_ID = '2PACX-1vSY9jYXsiVKjhSS5jp05I4yw_WlHP-4EpHO0dnjQncnLEdt43WB0nC-bDW--ipraJEEKEqHoabbfKX1';
-        const VERSION = '1.0.16'; // 更新版本號來避免快取問題
-        const SHEET_URL = `https://docs.google.com/spreadsheets/d/e/${SPREADSHEET_ID}/pub?output=csv&v=${VERSION}`;
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const menuContainer = document.getElementById('menu-container');
-        const cartItemsContainer = document.getElementById('cart-items');
-        const totalPriceEl = document.getElementById('total-price');
-        const cartCountEl = document.getElementById('cart-count');
-        const cartModal = document.getElementById('cart-modal');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const messageBox = document.getElementById('message-box');
-        const messageText = document.getElementById('message-text');
+        // Global variables provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        let cart = {};
-        let menuData = [];
+        let db, auth;
 
-        // 所有靜態文字都使用中文
+        // All static text in Traditional Chinese
         const staticText = {
             'emptyCart': '購物車是空的',
             'cartEmptyMsg': '購物車是空的，無法送出訂單',
-            'copySuccessMsg': '訂單內容已複製！請貼到 LINE 或其他通訊軟體',
-            'orderPrefix': '我的早餐訂單：\n',
-            'totalPrefix': '\n總計：',
+            'orderSaved': '訂單已送出！',
+            'orderSavedMsg': '您的訂單已成功送出，店家會盡快為您準備。',
+            'fillName': '請輸入您的姓名',
+            'fillNameMsg': '請在訂單上留下您的姓名，以便店家確認。',
             'errorTitle': '載入菜單失敗',
             'errorMsgPrefix': '發生錯誤：',
             'errorInstructions': '請按照以下步驟操作：',
@@ -110,24 +111,72 @@
             'errorStep2': '點選頂部選單的 **檔案 > 共用 > 發布到網路**。',
             'errorStep3': '在彈出的視窗中，確認整個文件已被發布，然後點擊 **「發布」**。',
             'errorStep4': '完成後，回到此頁面並重新整理。',
-            'errorStep5': '如果問題仍然存在，請確認您的試算表第一列標題為「類別」、「品項」、「價格」。'
+            'errorStep5': '如果問題仍然存在，請確認您的試算表第一列標題為「類別」、「品項」、「價格」。',
+            'loadingText': '載入中，請稍候...',
+            'mainTitle': '路易士早餐吧',
+            'menuTitle': '菜單',
+            'cartModalTitle': '您的訂單',
+            'totalText': '總計：',
+            'submitButton': '送出訂單'
         };
 
+        // UI element references
+        const SPREADSHEET_ID = '2PACX-1vSY9jYXsiVKjhSS5jp05I4yw_WlHP-4EpHO0dnjQncnLEdt43WB0nC-bDW--ipraJEEKEqHoabbfKX1';
+        const VERSION = '1.0.18'; // Update version number to bypass cache
+        const SHEET_URL = `https://docs.google.com/spreadsheets/d/e/${SPREADSHEET_ID}/pub?output=csv&v=${VERSION}`;
+        
+        const menuContainer = document.getElementById('menu-container');
+        const cartItemsContainer = document.getElementById('cart-items');
+        const totalPriceEl = document.getElementById('total-price');
+        const cartCountEl = document.getElementById('cart-count');
+        const cartModal = document.getElementById('cart-modal');
+        const messageModal = document.getElementById('message-modal');
+        const messageTitleEl = document.getElementById('message-title');
+        const messageTextEl = document.getElementById('message-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const submitButton = document.getElementById('submit-button');
+
+        let cart = {};
+        let menuData = [];
+
         /**
-         * 顯示臨時訊息框。
-         * @param {string} textKey 靜態文字字典中的鍵值。
+         * Initializes Firebase and authenticates the user.
          */
-        function showMessage(textKey) {
-            const text = staticText[textKey];
-            messageText.textContent = text;
-            messageBox.classList.remove('hidden');
-            setTimeout(() => {
-                messageBox.classList.add('hidden');
-            }, 3000);
+        async function initializeFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Sign in anonymously to get a user ID for Firestore operations
+                await signInAnonymously(auth);
+                console.log('Firebase initialized and signed in anonymously.');
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                // Handle the error gracefully without breaking the app
+            }
         }
 
         /**
-         * 切換購物車彈出視窗的顯示狀態。
+         * Displays a modal message to the user.
+         * @param {string} title The title of the message.
+         * @param {string} text The body of the message.
+         */
+        function showMessage(title, text) {
+            messageTitleEl.textContent = title;
+            messageTextEl.textContent = text;
+            messageModal.classList.remove('hidden');
+        }
+
+        /**
+         * Hides the modal message.
+         */
+        function hideMessage() {
+            messageModal.classList.add('hidden');
+        }
+
+        /**
+         * Toggles the display state of the cart modal.
          */
         function toggleCartModal() {
             updateCartModal();
@@ -135,16 +184,21 @@
         }
 
         /**
-         * 更新購物車彈出視窗的內容和總價。
+         * Updates the content and total price of the cart modal.
          */
         function updateCartModal() {
             cartItemsContainer.innerHTML = '';
             let total = 0;
             const itemsInCart = Object.values(cart).filter(item => item.quantity > 0);
-
+            
             if (itemsInCart.length === 0) {
                 cartItemsContainer.innerHTML = `<p class="text-center text-gray-500">${staticText.emptyCart}</p>`;
+                submitButton.disabled = true;
+                submitButton.classList.add('bg-gray-400', 'cursor-not-allowed');
             } else {
+                submitButton.disabled = false;
+                submitButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
+
                 itemsInCart.forEach(item => {
                     const itemTotal = item.quantity * item.price;
                     total += itemTotal;
@@ -164,9 +218,9 @@
         }
 
         /**
-         * 將品項加入或從購物車中移除。
-         * @param {string} originalName 品項的原始中文名稱。
-         * @param {string} action 'add' 或 'subtract'。
+         * Adds or subtracts an item from the cart.
+         * @param {string} originalName The original Chinese name of the item.
+         * @param {string} action 'add' or 'subtract'.
          */
         function handleCartAction(originalName, action) {
             const item = Object.values(menuData).flatMap(category => category).find(i => i.name === originalName);
@@ -188,7 +242,6 @@
                 }
             }
             
-            // 直接渲染中文菜單
             renderMenu(menuData);
 
             const totalCount = Object.values(cart).reduce((acc, item) => acc + item.quantity, 0);
@@ -201,39 +254,55 @@
         }
 
         /**
-         * 生成訂單摘要並複製到剪貼簿。
+         * Submits the order to Firestore.
          */
-        function submitOrder() {
+        async function submitOrder() {
+            const customerNameInput = document.getElementById('customer-name');
+            const customerName = customerNameInput.value.trim();
             const itemsInCart = Object.values(cart).filter(item => item.quantity > 0);
-            if (itemsInCart.length === 0) {
-                showMessage('cartEmptyMsg');
+
+            if (!customerName) {
+                showMessage(staticText.fillName, staticText.fillNameMsg);
                 return;
             }
 
-            let orderText = staticText.orderPrefix;
-            let total = 0;
-            itemsInCart.forEach(item => {
-                orderText += `- ${item.name} x ${item.quantity} (NT$ ${item.quantity * item.price})\n`;
-                total += item.quantity * item.price;
-            });
-            orderText += `${staticText.totalPrefix}NT$ ${total}`;
+            if (itemsInCart.length === 0) {
+                showMessage(staticText.cartEmptyMsg, staticText.emptyCart);
+                return;
+            }
 
-            const tempTextArea = document.createElement('textarea');
-            tempTextArea.value = orderText;
-            document.body.appendChild(tempTextArea);
-            tempTextArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(tempTextArea);
+            try {
+                // Get a reference to the 'orders' collection with the correct path
+                const ordersCollection = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
+                
+                // Prepare the order data
+                const orderData = {
+                    customerName: customerName,
+                    items: itemsInCart,
+                    totalPrice: itemsInCart.reduce((acc, item) => acc + (item.quantity * item.price), 0),
+                    timestamp: new Date().toISOString()
+                };
 
-            toggleCartModal();
-            showMessage('copySuccessMsg');
+                // Add the order to the Firestore collection
+                await addDoc(ordersCollection, orderData);
 
-            cart = {};
-            cartCountEl.textContent = '0';
+                showMessage(staticText.orderSaved, staticText.orderSavedMsg);
+
+                // Reset the cart and UI after submission
+                cart = {};
+                customerNameInput.value = '';
+                cartCountEl.textContent = '0';
+                toggleCartModal();
+                renderMenu(menuData);
+
+            } catch (error) {
+                console.error('Error submitting order:', error);
+                showMessage('訂單送出失敗', '無法送出您的訂單，請稍後再試。');
+            }
         }
 
         /**
-         * 從 Google 試算表獲取並顯示菜單。
+         * Fetches and displays the menu from the Google Sheet.
          */
         async function fetchMenu() {
             loadingSpinner.classList.remove('hidden');
@@ -291,8 +360,8 @@
         }
 
         /**
-         * 將菜單資料渲染到 HTML 頁面上。
-         * @param {object} categorizedMenu 包含菜單資料的物件。
+         * Renders the menu data to the HTML page.
+         * @param {object} categorizedMenu The categorized menu data.
          */
         function renderMenu(categorizedMenu) {
             menuContainer.innerHTML = '';
@@ -330,8 +399,9 @@
             }
         }
         
-        // 頁面載入時獲取菜單
+        // Initial setup on page load
         document.addEventListener('DOMContentLoaded', () => {
+            initializeFirebase();
             fetchMenu();
         });
     </script>
