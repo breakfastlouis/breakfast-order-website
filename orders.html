@@ -20,9 +20,18 @@
         class="bg-white p-4 mb-4 rounded shadow">
         <div class="font-bold text-blue-800">訂單編號：{{ order.orderId }}</div>
         <div class="text-sm text-gray-600">桌號：{{ order.tableNumber }}</div>
-        <div class="text-sm text-gray-600">總金額：NT$ {{ order.total }}</div>
         <div class="text-sm text-gray-600">狀態：{{ order.status }}</div>
         <div class="text-sm text-gray-400">時間：{{ formatTimestamp(order.createdAt) }}</div>
+
+        <div class="mt-2 text-sm text-gray-700">
+          <div class="font-semibold mb-1">品項：</div>
+          <ul class="list-disc pl-5">
+            <li v-for="item in order.items">{{ item.name }} - NT$ {{ item.price }}</li>
+          </ul>
+        </div>
+
+        <div class="mt-2 font-bold text-blue-700">總金額：NT$ {{ order.total }}</div>
+
         <div class="mt-2 space-x-2">
           <button v-if="order.status !== '完成'" @click="markOrderComplete(order)"
             class="text-sm bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded">
@@ -35,6 +44,8 @@
         </div>
       </li>
     </ul>
+  </div>
+
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAEpf1ffQFht5yBm-xCBBMVsdxjzbVhsBg",
@@ -42,12 +53,10 @@
       projectId: "louis-breakfast-tpe",
       storageBucket: "louis-breakfast-tpe.appspot.com",
       messagingSenderId: "707080689547",
-      appId: "1:707080689547:web:ca293380046a59e7de818e",
-      measurementId: "G-P4FXJC40KP"
+      appId: "1:707080689547:web:ca293380046a59e7de818e"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-
     const { createApp } = Vue;
 
     createApp({
