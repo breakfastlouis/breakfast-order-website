@@ -29,9 +29,9 @@
       </div>
     </div>
 
-    <!-- 側邊購物車面板 -->
+    <!-- 懸浮式購物車面板 -->
     <div v-if="showCartPanel"
-      class="fixed top-0 right-0 w-80 h-full bg-white shadow-lg p-4 z-40 overflow-y-auto transition">
+      class="fixed bottom-24 right-6 w-80 bg-white shadow-xl rounded-lg p-4 z-50 transition">
       <h2 class="text-xl font-bold mb-2">🛒 購物車</h2>
       <div v-if="cart.length === 0">目前尚未選擇品項</div>
       <ul>
@@ -40,6 +40,15 @@
           <button @click="removeFromCart(index)" class="ml-2 text-red-500">移除</button>
         </li>
       </ul>
+
+      <!-- 桌號輸入欄位 -->
+      <div class="mt-4">
+        <label for="table" class="block text-sm font-medium text-gray-700">桌號</label>
+        <input id="table" v-model="tableNumber" type="text"
+          placeholder="例如：A1、5號桌"
+          class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+      </div>
+
       <div class="mt-2 font-bold">總金額：NT$ {{ total }}</div>
       <button @click="submitOrder"
         class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded w-full">
@@ -71,6 +80,11 @@
         {{ cart.length }}
       </span>
     </button>
+
+    <!-- 訂單送出後提示 -->
+    <div v-if="orderSubmitted" class="mt-6 text-blue-700 font-semibold text-center">
+      訂單已送出！編號：{{ lastOrderId }}，感謝您的點餐 🙌
+    </div>
   </div>
 
   <script>
@@ -83,7 +97,10 @@
           cart: [],
           loading: true,
           orderSubmitted: false,
-          showCartPanel: false
+          showCartPanel: false,
+          tableNumber: '',
+          orderCounter: 1,
+          lastOrderId: ''
         };
       },
       computed: {
@@ -108,9 +125,23 @@
           this.cart.splice(index, 1);
         },
         submitOrder() {
+          const today = new Date();
+          const yyyy = today.getFullYear();
+          const mm = String(today.getMonth() + 1).padStart(2, '0');
+          const dd = String(today.getDate()).padStart(2, '0');
+          const dateStr = `${yyyy}${mm}${dd}`;
+          const serial = String(this.orderCounter).padStart(4, '0');
+          const orderId = `${dateStr}${serial}`;
+
+          console.log("訂單編號：", orderId);
+          console.log("桌號：", this.tableNumber);
           console.log("訂單內容：", this.cart);
+
+          this.lastOrderId = orderId;
+          this.orderCounter += 1;
           this.orderSubmitted = true;
           this.cart = [];
+          this.tableNumber = '';
           this.showCartPanel = false;
         },
         toggleCartPanel() {
@@ -124,13 +155,3 @@
             this.menu = data;
             this.loading = false;
           })
-          .catch(err => {
-            console.error("載入菜單失敗", err);
-            alert("菜單載入失敗，請稍後再試");
-            this.loading = false;
-          });
-      }
-    }).mount("#app");
-  </script>
-</body>
-</html>
