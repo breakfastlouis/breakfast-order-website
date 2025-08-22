@@ -16,9 +16,10 @@
     <h1 class="text-3xl font-extrabold text-blue-900 mb-6 text-center tracking-wide">
       路易士早餐吧
     </h1>
-    <div v-if="loading">🍳 菜單載入中...</div>
+    <div v-if="loading" class="text-center text-gray-600">🍳 菜單載入中...</div>
+    <div v-if="error" class="text-center text-red-600 font-semibold">⚠️ 菜單載入失敗，請稍後再試</div>
 
-    <div v-else>
+    <div v-if="!loading && !error">
       <div v-for="item in sortedMenu" :key="item.id" class="bg-white p-4 mb-4 rounded-lg shadow hover:shadow-lg transition">
         <div class="text-lg font-semibold text-gray-800">{{ item.id }}. {{ item.name }}</div>
         <div class="text-sm text-gray-500">NT$ {{ item.price }}</div>
@@ -35,35 +36,11 @@
       <div v-if="cart.length === 0">目前尚未選擇品項</div>
       <ul>
         <li v-for="(item, index) in cart" :key="index" class="mb-2">
-          {{ item.id }}. {{ item.name }} - NT$ {{ item.price }}
-          <button @click="removeFromCart(index)" class="ml-2 text-red-500">移除</button>
-        </li>
-      </ul>
-
-      <!-- 桌號輸入欄位 -->
-      <div class="mt-4">
-        <label for="table" class="block text-sm font-medium text-gray-700">桌號</label>
-        <input id="table" v-model="tableNumber" type="text"
-          placeholder="例如：A1、5號桌"
-          class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-      </div>
-
-      <div class="mt-2 font-bold">總金額：NT$ {{ total }}</div>
-      <button @click="submitOrder"
-        class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded w-full">
-        ✅ 送出訂單
-      </button>
-    </div>
-    <!-- 購物車浮動按鈕 -->
+              <!-- 購物車浮動按鈕 -->
     <button @click="toggleCartPanel"
       class="fixed bottom-6 right-6 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition z-50 relative"
       aria-label="購物車">
-      <svg v-if="cart.length === 0" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
-        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round"
-          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.6 8h13.2M7 13L5.4 5M9 21a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" />
-      </svg>
-      <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor"
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor"
         viewBox="0 0 24 24">
         <path d="M7 4h-2l-1 2h2l1-2zm1 2h10l4 8H7l1-8zm0 10h10v2H8v-2zm1 4a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z"/>
       </svg>
@@ -72,4 +49,113 @@
         {{ cart.length }}
       </span>
     </button>
+
+    <!-- 訂單送出後提示 -->
+    <div v-if="orderSubmitted" class="mt-6 text-blue-700 font-semibold text-center">
+      訂單已送出！編號：{{ lastOrderId }}，桌號：{{ lastTableNumber }}，感謝您的點餐 🙌
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAEpf1ffQFht5yBm-xCBBMVsdxjzbVhsBg",
+      authDomain: "louis-breakfast-tpe.firebaseapp.com",
+      projectId: "louis-breakfast-tpe",
+      storageBucket: "louis-breakfast-tpe.appspot.com",
+      messagingSenderId: "707080689547",
+      appId: "1:707080689547:web:ca293380046a59e7de818e",
+      measurementId: "G-P4FXJC40KP"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          menu: [],
+          cart: [],
+          tableNumber: '',
+          lastTableNumber: '',
+          lastOrderId: '',
+          orderCounter: 1,
+          showCartPanel: false,
+          orderSubmitted: false,
+          loading: true,
+          error: false
+        };
+      },
+      computed: {
+        total() {
+          return this.cart.reduce((sum, item) => sum + Number(item.price), 0);
+        },
+        sortedMenu() {
+          return this.menu
+            .filter(item => item.available !== false)
+            .sort((a, b) => a.id.localeCompare(b.id, 'zh-Hant', { numeric: true }));
+        }
+      },
+      methods: {
+        addToCart(item) {
+          this.cart.push(item);
+        },
+        removeFromCart(index) {
+          this.cart.splice(index, 1);
+        },
+        toggleCartPanel() {
+          this.showCartPanel = !this.showCartPanel;
+        },
+        async submitOrder() {
+          const today = new Date();
+          const yyyy = today.getFullYear();
+          const mm = String(today.getMonth() + 1).padStart(2, '0');
+          const dd = String(today.getDate()).padStart(2, '0');
+          const dateStr = `${yyyy}${mm}${dd}`;
+          const serial = String(this.orderCounter).padStart(4, '0');
+          const orderId = `${dateStr}${serial}`;
+
+          const payload = {
+            orderId,
+            tableNumber: this.tableNumber,
+            items: this.cart.map(item => ({
+              id: item.id,
+              name: item.name,
+              price: item.price,
+              qty: 1
+            })),
+            total: this.total,
+            status: "處理中",
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+
+          try {
+            await db.collection("orders").add(payload);
+            this.lastOrderId = orderId;
+            this.lastTableNumber = this.tableNumber;
+            this.orderCounter++;
+            this.cart = [];
+            this.tableNumber = '';
+            this.orderSubmitted = true;
+            this.showCartPanel = false;
+          } catch (e) {
+            console.error("送出訂單失敗", e);
+            alert("送出訂單失敗，請稍後再試");
+          }
+        }
+      },
+      mounted() {
+        db.collection("menu").orderBy("id").onSnapshot(snap => {
+          this.menu = snap.docs.map(d => d.data());
+          this.loading = false;
+        }, err => {
+          console.error("載入菜單失敗", err);
+          this.loading = false;
+          this.error = true;
+        });
+      }
+    }).mount("#app");
+  </script>
+</body>
+</html>
 
