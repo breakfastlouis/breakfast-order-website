@@ -15,7 +15,7 @@
 
     <div v-else>
       <div v-for="item in sortedMenu" :key="item.id" class="bg-white p-4 mb-3 rounded shadow">
-        <div class="font-semibold">{{ item.id }}.{{ item.name }}</div>
+        <div class="font-semibold">{{ item.id }}. {{ item.name }}</div>
         <div class="text-sm text-gray-600">NT$ {{ item.price }}</div>
         <button @click="addToCart(item)" class="mt-2 bg-blue-500 text-white px-3 py-1 rounded">
           加入購物車
@@ -28,7 +28,7 @@
       <div v-if="cart.length === 0">目前尚未選擇品項</div>
       <ul>
         <li v-for="(item, index) in cart" :key="index" class="mb-1">
-          {{ item.id }}.{{ item.name }} - NT$ {{ item.price }}
+          {{ item.id }}. {{ item.name }} - NT$ {{ item.price }}
           <button @click="removeFromCart(index)" class="ml-2 text-red-500">移除</button>
         </li>
       </ul>
@@ -85,30 +85,18 @@
           console.log("訂單內容：", this.cart);
           this.orderSubmitted = true;
           this.cart = [];
-        },
-        parseCSV(csvText) {
-          const lines = csvText.trim().split('\n');
-          const headers = lines[0].split(',').map(h => h.trim());
-          const items = lines.slice(1).map(line => {
-            const values = line.split(',').map(v => v.trim());
-            const item = {};
-            headers.forEach((key, i) => {
-              item[key] = values[i];
-            });
-            return item;
-          });
-          return items;
         }
       },
       mounted() {
-        fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vQjGlrsEv20Fn9NPcVXq7oOzddPKjZkY95BAMEIxmo-frZkTDD7Bz4gojpCT-c-mRKg7E2cRKpE5iWt/pub?output=csv")
-          .then(res => res.text())
-          .then(csv => {
-            this.menu = this.parseCSV(csv);
+        fetch('./menu.json')
+          .then(res => res.json())
+          .then(data => {
+            this.menu = data;
             this.loading = false;
           })
           .catch(err => {
             console.error("載入菜單失敗", err);
+            alert("菜單載入失敗，請稍後再試");
             this.loading = false;
           });
       }
