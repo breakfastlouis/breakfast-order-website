@@ -45,7 +45,7 @@
       </span>
     </button>
 
-    <!-- 右側懸浮購物車面板（手機也支援） -->
+    <!-- 右側懸浮購物車面板 -->
     <div v-if="showCartPanel"
       class="fixed bottom-20 right-4 w-[90vw] max-w-sm bg-white shadow-xl rounded-lg p-4 z-50 transition overflow-y-auto max-h-[70vh] border border-blue-200">
       <h2 class="text-xl font-bold mb-2">🛒 購物車</h2>
@@ -89,7 +89,6 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-
     const { createApp } = Vue;
 
     createApp({
@@ -155,7 +154,3 @@
             this.lastOrderId = orderId;
             this.lastTableNumber = this.tableNumber;
             this.orderCounter++;
-            this.cart = [];
-            this.tableNumber = '';
-            this.orderSubmitted = true;
-            this.show
