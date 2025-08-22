@@ -43,7 +43,7 @@
 
         <!-- Floating Cart Button -->
         <div id="cart-button" class="fixed bottom-4 right-4 z-50">
-            <button onclick="toggleCartModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-full shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-300">
+            <button onclick="window.toggleCartModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-full shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-300">
                 <i class="fas fa-shopping-cart text-xl"></i>
                 <span id="cart-count" class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full transform translate-x-1/2 -translate-y-1/2">0</span>
             </button>
@@ -54,7 +54,7 @@
             <div class="bg-white rounded-2xl shadow-xl p-6 m-4 max-w-lg w-full transform transition-all scale-95 md:scale-100">
                 <div class="flex justify-between items-center mb-4">
                     <h3 id="cart-modal-title" class="text-2xl font-bold text-gray-800">您的訂單</h3>
-                    <button onclick="toggleCartModal()" class="text-gray-500 hover:text-gray-700 text-3xl">&times;</button>
+                    <button onclick="window.toggleCartModal()" class="text-gray-500 hover:text-gray-700 text-3xl">&times;</button>
                 </div>
                 <!-- Customer info and Table number input -->
                 <div class="mb-4">
@@ -74,7 +74,7 @@
                     <span id="total-text">總計：</span>
                     <span id="total-price">NT$ 0</span>
                 </div>
-                <button id="submit-button" onclick="submitOrder()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-green-300">
+                <button id="submit-button" onclick="window.submitOrder()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-green-300">
                     送出訂單
                 </button>
             </div>
@@ -85,7 +85,7 @@
             <div class="bg-white rounded-2xl shadow-xl p-6 m-4 max-w-sm w-full text-center">
                 <h3 id="message-title" class="text-2xl font-bold mb-2"></h3>
                 <p id="message-text" class="text-gray-700 mb-4"></p>
-                <button onclick="hideMessage()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">好的</button>
+                <button onclick="window.hideMessage()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">好的</button>
             </div>
         </div>
     </div>
@@ -170,7 +170,7 @@
          * @param {string} title The title of the message.
          * @param {string} text The body of the message.
          */
-        function showMessage(title, text) {
+        window.showMessage = function(title, text) {
             messageTitleEl.textContent = title;
             messageTextEl.textContent = text;
             messageModal.classList.remove('hidden');
@@ -179,7 +179,7 @@
         /**
          * Hides the modal message.
          */
-        function hideMessage() {
+        window.hideMessage = function() {
             messageModal.classList.add('hidden');
         }
 
@@ -271,16 +271,16 @@
             const itemsInCart = Object.values(cart).filter(item => item.quantity > 0);
 
             if (!customerName) {
-                showMessage(staticText.fillName, staticText.fillNameMsg);
+                window.showMessage(staticText.fillName, staticText.fillNameMsg);
                 return;
             }
             if (tableNumber === 'default') {
-                showMessage('請選擇桌號', '請選擇您的桌號以便送出訂單。');
+                window.showMessage('請選擇桌號', '請選擇您的桌號以便送出訂單。');
                 return;
             }
 
             if (itemsInCart.length === 0) {
-                showMessage(staticText.cartEmptyMsg, staticText.emptyCart);
+                window.showMessage(staticText.cartEmptyMsg, staticText.emptyCart);
                 return;
             }
 
@@ -300,19 +300,19 @@
                 // Add the order to the Firestore collection
                 await addDoc(ordersCollection, orderData);
 
-                showMessage(staticText.orderSaved, staticText.orderSavedMsg);
+                window.showMessage(staticText.orderSaved, staticText.orderSavedMsg);
 
                 // Reset the cart and UI after submission
                 cart = {};
                 customerNameInput.value = '';
                 tableNumberSelect.value = 'default';
                 cartCountEl.textContent = '0';
-                toggleCartModal();
+                window.toggleCartModal();
                 renderMenu(menuData);
 
             } catch (error) {
                 console.error('Error submitting order:', error);
-                showMessage('訂單送出失敗', '無法送出您的訂單，請稍後再試。');
+                window.showMessage('訂單送出失敗', '無法送出您的訂單，請稍後再試。');
             }
         }
         
@@ -413,9 +413,10 @@
                             <p class="text-gray-600">NT$ ${item.price}</p>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <button onclick="handleCartAction('${item.name}', 'subtract')" class="text-blue-500 hover:text-blue-700 font-bold text-xl px-2 py-1 rounded-full border border-blue-500 hover:border-blue-700 transition-colors">-</button>
+                            <!-- 為了改善手機觸控體驗，將按鈕的 padding 增加為 p-2 -->
+                            <button onclick="window.handleCartAction('${item.name}', 'subtract')" class="text-blue-500 hover:text-blue-700 font-bold text-xl p-2 rounded-full border border-blue-500 hover:border-blue-700 transition-colors">-</button>
                             <span id="quantity-${item.name.replace(/\s/g, '-')}" class="text-lg font-bold w-6 text-center">${cart[item.name]?.quantity || 0}</span>
-                            <button onclick="handleCartAction('${item.name}', 'add')" class="text-blue-500 hover:text-blue-700 font-bold text-xl px-2 py-1 rounded-full border border-blue-500 hover:border-blue-700 transition-colors">+</button>
+                            <button onclick="window.handleCartAction('${item.name}', 'add')" class="text-blue-500 hover:text-blue-700 font-bold text-xl p-2 rounded-full border border-blue-500 hover:border-blue-700 transition-colors">+</button>
                         </div>
                     `;
                     menuList.appendChild(itemEl);
