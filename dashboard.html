@@ -52,13 +52,20 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global variables provided by the Canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // IMPORTANT: The following is your Firebase project config.
+        const firebaseConfig = {
+          apiKey: "AIzaSyB24oztV3Ljh2s2pPvDBv4z10WdP0N5Q2E",
+          authDomain: "fir-a2c0f.firebaseapp.com",
+          projectId: "fir-a2c0f",
+          storageBucket: "fir-a2c0f.firebasestorage.app",
+          messagingSenderId: "932859612366",
+          appId: "1:932859612366:web:74b0c71f1367018033149f"
+        };
+
+        const appId = firebaseConfig.projectId;
 
         let db, auth;
         let userId = null;
@@ -109,10 +116,12 @@
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
-
-                onAuthStateChanged(auth, async (user) => {
+                
+                // Use onAuthStateChanged to ensure we get the user object after sign-in completes.
+                onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
+                        console.log("Firebase 驗證狀態已改變。使用者 ID:", userId);
                         authStatusEl.innerHTML = `
                             <i class="fas fa-check-circle text-green-500"></i>
                             <span>${staticText.authSuccess}</span>
@@ -129,21 +138,26 @@
                         `;
                         document.getElementById('main-content').prepend(userIdEl);
                         
-                        // Start listening for orders
+                        // Start listening for orders once authenticated
                         startListeningForOrders();
                     } else {
-                        // Sign in with the provided custom token
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                             // Fallback to anonymous sign-in if no token is available
-                            await signInAnonymously(auth);
-                        }
+                         // If no user is authenticated, sign in anonymously.
+                         console.log("尚未登入，正在進行匿名登入...");
+                         signInAnonymously(auth).then(() => {
+                             console.log("匿名登入成功。");
+                         }).catch((error) => {
+                            console.error("匿名登入失敗:", error);
+                            authStatusEl.innerHTML = `
+                                <i class="fas fa-times-circle text-red-500"></i>
+                                <span>${staticText.authError}</span>
+                            `;
+                            showMessage('驗證失敗', '無法連接到後台。請檢查您的網路連線或稍後再試。');
+                         });
                     }
                 });
 
             } catch (error) {
-                console.error("Firebase initialization or authentication failed:", error);
+                console.error("Firebase 初始化失敗:", error);
                 authStatusEl.innerHTML = `
                     <i class="fas fa-times-circle text-red-500"></i>
                     <span>${staticText.authError}</span>
@@ -177,6 +191,12 @@
          * @param {string} orderId The ID of the order to delete.
          */
         async function deleteOrder(orderId) {
+            if (!db || !userId) {
+                console.error("Firestore not initialized or user not authenticated. Cannot delete order.");
+                showMessage('刪除失敗', '無法刪除訂單，請稍後再試。');
+                return;
+            }
+            
             // This is a custom modal confirmation, as window.confirm() might not work in some environments.
             const userConfirmed = await new Promise(resolve => {
                 const modal = document.createElement('div');
@@ -227,6 +247,7 @@
             const ordersCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
             
             onSnapshot(ordersCollectionRef, (querySnapshot) => {
+                console.log("從 Firestore 接收到新的訂單資料。");
                 const orders = [];
                 querySnapshot.forEach((doc) => {
                     const orderData = doc.data();
