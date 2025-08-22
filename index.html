@@ -1,438 +1,83 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>路易士早餐吧</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .menu-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>早餐店點餐系統</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; background: #f8f8f8; }
+    header { background: #ff9800; color: white; padding: 15px; text-align: center; font-size: 20px; }
+    .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
+    .item { background: white; padding: 10px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .item h3 { margin: 0; font-size: 16px; }
+    .item p { margin: 5px 0; color: #555; }
+    .btn { background: #ff9800; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+    .cart { background: white; padding: 10px; position: fixed; bottom: 0; left: 0; right: 0; border-top: 2px solid #ddd; }
+  </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center">
+<body>
+  <header>早餐店點餐系統</header>
 
-    <div class="container mx-auto px-4 py-8 max-w-4xl w-full">
-        <!-- Header Section -->
-        <header class="text-center mb-8">
-            <h1 id="main-title" class="text-6xl md:text-7xl font-black text-blue-400 tracking-tight leading-none mb-2 rounded-xl p-4 bg-white shadow-lg">
-                路易士早餐吧
-            </h1>
-        </header>
+  <div class="menu" id="menu"></div>
 
-        <!-- Menu Section -->
-        <main class="space-y-6">
-            <h2 id="menu-title" class="text-3xl font-bold text-gray-800 mb-4 text-center">菜單</h2>
-            <div id="loading-spinner" class="text-center p-8">
-                <i class="fas fa-spinner fa-spin text-4xl text-blue-500"></i>
-                <p id="loading-text" class="mt-2 text-gray-500">載入中，請稍候...</p>
-            </div>
-            <div id="menu-container" class="space-y-6">
-                <!-- Menu items will be dynamically loaded here -->
-            </div>
-        </main>
+  <div class="cart">
+    <h3>購物車</h3>
+    <ul id="cart"></ul>
+    <p id="total">總金額: $0</p>
+    <button class="btn" onclick="checkout()">送出訂單</button>
+  </div>
 
-        <!-- Floating Cart Button -->
-        <div id="cart-button" class="fixed bottom-4 right-4 z-50">
-            <button onclick="window.toggleCartModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-full shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-300">
-                <i class="fas fa-shopping-cart text-xl"></i>
-                <span id="cart-count" class="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full transform translate-x-1/2 -translate-y-1/2">0</span>
-            </button>
-        </div>
+  <script>
+    const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSY9jYXsiVKjhSS5jp05I4yw_WlHP-4EpHO0dnjQncnLEdt43WB0nC-bDW--ipraJEEKEqHoabbfKX1/pub?output=csv";
+    let cart = [];
 
-        <!-- Cart Modal -->
-        <div id="cart-modal" class="fixed inset-0 z-50 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden">
-            <div class="bg-white rounded-2xl shadow-xl p-6 m-4 max-w-lg w-full transform transition-all scale-95 md:scale-100">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 id="cart-modal-title" class="text-2xl font-bold text-gray-800">您的訂單</h3>
-                    <button onclick="window.toggleCartModal()" class="text-gray-500 hover:text-gray-700 text-3xl">&times;</button>
-                </div>
-                <!-- Customer info and Table number input -->
-                <div class="mb-4">
-                    <label for="customer-name" class="block text-gray-700 font-bold mb-1">您的姓名:</label>
-                    <input type="text" id="customer-name" placeholder="請輸入您的姓名" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div class="mb-4">
-                    <label for="table-number" class="block text-gray-700 font-bold mb-1">桌號:</label>
-                    <select id="table-number" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <!-- Options will be generated by JS -->
-                    </select>
-                </div>
-                <div id="cart-items" class="max-h-80 overflow-y-auto mb-4 border-t border-b border-gray-200 py-4">
-                    <!-- Cart items will be displayed here -->
-                </div>
-                <div class="flex justify-between items-center text-lg font-bold mb-4">
-                    <span id="total-text">總計：</span>
-                    <span id="total-price">NT$ 0</span>
-                </div>
-                <button id="submit-button" onclick="window.submitOrder()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-green-300">
-                    送出訂單
-                </button>
-            </div>
-        </div>
+    async function loadMenu() {
+      const res = await fetch(sheetUrl);
+      const text = await res.text();
+      const rows = text.split("\n").map(r => r.split(","));
+      const menuDiv = document.getElementById("menu");
 
-        <!-- Message Modal -->
-        <div id="message-modal" class="fixed inset-0 z-50 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden">
-            <div class="bg-white rounded-2xl shadow-xl p-6 m-4 max-w-sm w-full text-center">
-                <h3 id="message-title" class="text-2xl font-bold mb-2"></h3>
-                <p id="message-text" class="text-gray-700 mb-4"></p>
-                <button onclick="window.hideMessage()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">好的</button>
-            </div>
-        </div>
-    </div>
+      rows.slice(1).forEach(row => {
+        let [套餐, 餐點, 飲料, 價格] = row;
+        if (!套餐) return;
+        let div = document.createElement("div");
+        div.className = "item";
+        div.innerHTML = `
+          <h3>${餐點}</h3>
+          <p>飲料: ${飲料}</p>
+          <p>價格: $${價格}</p>
+          <button class="btn" onclick='addToCart("${餐點}", ${價格})'>加入</button>
+        `;
+        menuDiv.appendChild(div);
+      });
+    }
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    function addToCart(name, price) {
+      cart.push({ name, price });
+      renderCart();
+    }
 
-        // Global variables provided by the Canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    function renderCart() {
+      const cartList = document.getElementById("cart");
+      cartList.innerHTML = "";
+      let total = 0;
+      cart.forEach(item => {
+        total += item.price;
+        let li = document.createElement("li");
+        li.textContent = `${item.name} - $${item.price}`;
+        cartList.appendChild(li);
+      });
+      document.getElementById("total").textContent = "總金額: $" + total;
+    }
 
-        let db, auth;
+    function checkout() {
+      alert("訂單已送出! (目前示範: 只顯示在畫面，不會存到資料庫)\n" +
+        cart.map(i => i.name + " - $" + i.price).join("\n"));
+      cart = [];
+      renderCart();
+    }
 
-        // All static text in Traditional Chinese
-        const staticText = {
-            'emptyCart': '購物車是空的',
-            'cartEmptyMsg': '購物車是空的，無法送出訂單',
-            'orderSaved': '訂單已送出！',
-            'orderSavedMsg': '您的訂單已成功送出，店家會盡快為您準備。',
-            'fillName': '請輸入您的姓名',
-            'fillNameMsg': '請在訂單上留下您的姓名，以便店家確認。',
-            'errorTitle': '載入菜單失敗',
-            'errorMsgPrefix': '發生錯誤：',
-            'errorInstructions': '請按照以下步驟操作：',
-            'errorStep1': '確認您的 Google 試算表網址正確，並在網址中包含 **gid** 參數。',
-            'errorStep2': '點選頂部選單的 **檔案 > 共用 > 發布到網路**。',
-            'errorStep3': '在彈出的視窗中，確認整個文件已被發布，然後點擊 **「發布」**。',
-            'errorStep4': '完成後，回到此頁面並重新整理。',
-            'errorStep5': '如果問題仍然存在，請確認您的試算表第一列標題為「類別」、「品項」、「價格」。',
-            'loadingText': '載入中，請稍候...',
-            'mainTitle': '路易士早餐吧',
-            'menuTitle': '菜單',
-            'cartModalTitle': '您的訂單',
-            'totalText': '總計：',
-            'submitButton': '送出訂單',
-            'selectTable': '請選擇桌號'
-        };
-
-        // UI element references
-        const SPREADSHEET_ID = '2PACX-1vSY9jYXsiVKjhSS5jp05I4yw_WlHP-4EpHO0dnjQncnLEdt43WB0nC-bDW--ipraJEEKEqHoabbfKX1';
-        const VERSION = '1.0.18'; // Update version number to bypass cache
-        const SHEET_URL = `https://docs.google.com/spreadsheets/d/e/${SPREADSHEET_ID}/pub?output=csv&v=${VERSION}`;
-        
-        const menuContainer = document.getElementById('menu-container');
-        const cartItemsContainer = document.getElementById('cart-items');
-        const totalPriceEl = document.getElementById('total-price');
-        const cartCountEl = document.getElementById('cart-count');
-        const cartModal = document.getElementById('cart-modal');
-        const messageModal = document.getElementById('message-modal');
-        const messageTitleEl = document.getElementById('message-title');
-        const messageTextEl = document.getElementById('message-text');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const submitButton = document.getElementById('submit-button');
-        const tableNumberSelect = document.getElementById('table-number');
-
-        let cart = {};
-        let menuData = [];
-
-        /**
-         * Initializes Firebase and authenticates the user.
-         */
-        async function initializeFirebase() {
-            try {
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                // Sign in anonymously to get a user ID for Firestore operations
-                await signInAnonymously(auth);
-                console.log('Firebase initialized and signed in anonymously.');
-            } catch (error) {
-                console.error("Error initializing Firebase:", error);
-                // Handle the error gracefully without breaking the app
-            }
-        }
-
-        /**
-         * Displays a modal message to the user.
-         * @param {string} title The title of the message.
-         * @param {string} text The body of the message.
-         */
-        window.showMessage = function(title, text) {
-            messageTitleEl.textContent = title;
-            messageTextEl.textContent = text;
-            messageModal.classList.remove('hidden');
-        }
-
-        /**
-         * Hides the modal message.
-         */
-        window.hideMessage = function() {
-            messageModal.classList.add('hidden');
-        }
-
-        /**
-         * Toggles the display state of the cart modal.
-         */
-        window.toggleCartModal = function() {
-            updateCartModal();
-            cartModal.classList.toggle('hidden');
-        }
-
-        /**
-         * Updates the content and total price of the cart modal.
-         */
-        function updateCartModal() {
-            cartItemsContainer.innerHTML = '';
-            let total = 0;
-            const itemsInCart = Object.values(cart).filter(item => item.quantity > 0);
-            
-            if (itemsInCart.length === 0) {
-                cartItemsContainer.innerHTML = `<p class="text-center text-gray-500">${staticText.emptyCart}</p>`;
-                submitButton.disabled = true;
-                submitButton.classList.add('bg-gray-400', 'cursor-not-allowed');
-            } else {
-                submitButton.disabled = false;
-                submitButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
-
-                itemsInCart.forEach(item => {
-                    const itemTotal = item.quantity * item.price;
-                    total += itemTotal;
-                    const itemEl = document.createElement('div');
-                    itemEl.className = 'flex justify-between items-center py-2 border-b last:border-b-0';
-                    itemEl.innerHTML = `
-                        <div class="flex items-center">
-                            <span class="text-gray-800 font-bold">${item.name}</span>
-                            <span class="text-sm text-gray-500 ml-2">x ${item.quantity}</span>
-                        </div>
-                        <span class="text-gray-700">NT$ ${itemTotal}</span>
-                    `;
-                    cartItemsContainer.appendChild(itemEl);
-                });
-            }
-            totalPriceEl.textContent = `NT$ ${total}`;
-        }
-
-        /**
-         * Adds or subtracts an item from the cart.
-         * @param {string} originalName The original Chinese name of the item.
-         * @param {string} action 'add' or 'subtract'.
-         */
-        window.handleCartAction = function(originalName, action) {
-            const item = Object.values(menuData).flatMap(category => category).find(i => i.name === originalName);
-
-            if (!item) {
-                console.error(`原始名稱為 "${originalName}" 的品項未找到。`);
-                return;
-            }
-
-            if (!cart[originalName]) {
-                cart[originalName] = { name: item.name, price: item.price, quantity: 0 };
-            }
-
-            if (action === 'add') {
-                cart[originalName].quantity++;
-            } else if (action === 'subtract') {
-                if (cart[originalName].quantity > 0) {
-                    cart[originalName].quantity--;
-                }
-            }
-            
-            renderMenu(menuData);
-
-            const totalCount = Object.values(cart).reduce((acc, item) => acc + item.quantity, 0);
-            cartCountEl.textContent = totalCount;
-            if (totalCount > 0) {
-                cartCountEl.classList.remove('hidden');
-            } else {
-                cartCountEl.classList.add('hidden');
-            }
-        }
-
-        /**
-         * Submits the order to Firestore.
-         */
-        window.submitOrder = async function() {
-            const customerNameInput = document.getElementById('customer-name');
-            const customerName = customerNameInput.value.trim();
-            const tableNumber = tableNumberSelect.value;
-            const itemsInCart = Object.values(cart).filter(item => item.quantity > 0);
-
-            if (!customerName) {
-                window.showMessage(staticText.fillName, staticText.fillNameMsg);
-                return;
-            }
-            if (tableNumber === 'default') {
-                window.showMessage('請選擇桌號', '請選擇您的桌號以便送出訂單。');
-                return;
-            }
-
-            if (itemsInCart.length === 0) {
-                window.showMessage(staticText.cartEmptyMsg, staticText.emptyCart);
-                return;
-            }
-
-            try {
-                // Get a reference to the 'orders' collection with the correct path
-                const ordersCollection = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
-                
-                // Prepare the order data
-                const orderData = {
-                    customerName: customerName,
-                    tableNumber: tableNumber,
-                    items: itemsInCart,
-                    totalPrice: itemsInCart.reduce((acc, item) => acc + (item.quantity * item.price), 0),
-                    timestamp: new Date().toISOString()
-                };
-
-                // Add the order to the Firestore collection
-                await addDoc(ordersCollection, orderData);
-
-                window.showMessage(staticText.orderSaved, staticText.orderSavedMsg);
-
-                // Reset the cart and UI after submission
-                cart = {};
-                customerNameInput.value = '';
-                tableNumberSelect.value = 'default';
-                cartCountEl.textContent = '0';
-                window.toggleCartModal();
-                renderMenu(menuData);
-
-            } catch (error) {
-                console.error('Error submitting order:', error);
-                window.showMessage('訂單送出失敗', '無法送出您的訂單，請稍後再試。');
-            }
-        }
-        
-        /**
-         * Populates the table number select dropdown.
-         */
-        function populateTableNumbers() {
-            let options = `<option value="default">${staticText.selectTable}</option>`;
-            for (let i = 1; i <= 10; i++) {
-                options += `<option value="${i}">桌號 ${i}</option>`;
-            }
-            tableNumberSelect.innerHTML = options;
-        }
-
-
-        /**
-         * Fetches and displays the menu from the Google Sheet.
-         */
-        async function fetchMenu() {
-            loadingSpinner.classList.remove('hidden');
-
-            try {
-                const response = await fetch(SHEET_URL);
-                if (!response.ok) {
-                    throw new Error(`${staticText.errorMsgPrefix}網路連線錯誤，無法載入菜單。狀態碼：${response.status}`);
-                }
-                const csvText = await response.text();
-
-                const rows = csvText.trim().split('\n').slice(1);
-                const categorizedMenu = {};
-
-                rows.forEach(row => {
-                    const cols = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-                    if (!cols || cols.length < 3) {
-                        return;
-                    }
-
-                    const category = cols[0].trim().replace(/^"|"$/g, '');
-                    const name = cols[1].trim().replace(/^"|"$/g, '');
-                    const price = parseFloat(cols[2].trim().replace(/^"|"$/g, ''));
-
-                    if (name && !isNaN(price)) {
-                        if (!categorizedMenu[category]) {
-                            categorizedMenu[category] = [];
-                        }
-                        categorizedMenu[category].push({ name, price });
-                    }
-                });
-                
-                menuData = categorizedMenu;
-                renderMenu(menuData);
-                
-            } catch (error) {
-                console.error('載入菜單時發生錯誤:', error);
-                menuContainer.innerHTML = `
-                    <div class="text-center p-8 bg-red-100 text-red-700 rounded-lg shadow-inner">
-                        <h3 class="text-xl font-bold">${staticText.errorTitle}</h3>
-                        <p class="mt-2 text-red-600">${staticText.errorMsgPrefix} 無法載入菜單。請稍後再試。</p>
-                        <p class="mt-4 font-bold">${staticText.errorInstructions}</p>
-                        <ul class="text-left list-disc list-inside mt-2 space-y-2">
-                            <li>${staticText.errorStep1}</li>
-                            <li>${staticText.errorStep2}</li>
-                            <li>${staticText.errorStep3}</li>
-                            <li>${staticText.errorStep4}</li>
-                            <li>${staticText.errorStep5}</li>
-                        </ul>
-                    </div>
-                `;
-            } finally {
-                loadingSpinner.classList.add('hidden');
-            }
-        }
-
-        /**
-         * Renders the menu data to the HTML page.
-         * @param {object} categorizedMenu The categorized menu data.
-         */
-        function renderMenu(categorizedMenu) {
-            menuContainer.innerHTML = '';
-            for (const category in categorizedMenu) {
-                const categorySection = document.createElement('section');
-                categorySection.className = 'bg-white p-6 rounded-2xl shadow-lg transition-transform hover:shadow-xl hover:scale-[1.01]';
-                
-                const categoryTitle = document.createElement('h3');
-                categoryTitle.className = 'text-2xl font-bold text-gray-900 mb-4 border-b-2 border-blue-400 pb-2';
-                categoryTitle.textContent = category;
-                categorySection.appendChild(categoryTitle);
-
-                const menuList = document.createElement('div');
-                menuList.className = 'space-y-4';
-                
-                categorizedMenu[category].forEach(item => {
-                    const itemEl = document.createElement('div');
-                    itemEl.className = 'flex items-center justify-between p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer border border-gray-200';
-                    itemEl.innerHTML = `
-                        <div>
-                            <p class="font-semibold text-gray-800 text-lg">${item.name}</p>
-                            <p class="text-gray-600">NT$ ${item.price}</p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <!-- 為了改善手機觸控體驗，將按鈕的 padding 增加為 p-2 -->
-                            <button onclick="window.handleCartAction('${item.name}', 'subtract')" class="text-blue-500 hover:text-blue-700 font-bold text-xl p-2 rounded-full border border-blue-500 hover:border-blue-700 transition-colors">-</button>
-                            <span id="quantity-${item.name.replace(/\s/g, '-')}" class="text-lg font-bold w-6 text-center">${cart[item.name]?.quantity || 0}</span>
-                            <button onclick="window.handleCartAction('${item.name}', 'add')" class="text-blue-500 hover:text-blue-700 font-bold text-xl p-2 rounded-full border border-blue-500 hover:border-blue-700 transition-colors">+</button>
-                        </div>
-                    `;
-                    menuList.appendChild(itemEl);
-                });
-                
-                categorySection.appendChild(menuList);
-                menuContainer.appendChild(categorySection);
-            }
-        }
-        
-        // Initial setup on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeFirebase();
-            fetchMenu();
-            populateTableNumbers();
-        });
-    </script>
+    loadMenu();
+  </script>
 </body>
 </html>
