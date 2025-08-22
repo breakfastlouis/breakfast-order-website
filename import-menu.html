@@ -3,3 +3,46 @@
 <head>
   <meta charset="UTF-8" />
   <title>匯入菜單資料</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <h1 style="font-family: sans-serif; padding: 1em;">🍳 匯入路易士早餐吧菜單資料</h1>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAEpf1ffQFht5yBm-xCBBMVsdxjzbVhsBg",
+      authDomain: "louis-breakfast-tpe.firebaseapp.com",
+      projectId: "louis-breakfast-tpe",
+      storageBucket: "louis-breakfast-tpe.appspot.com",
+      messagingSenderId: "707080689547",
+      appId: "1:707080689547:web:ca293380046a59e7de818e",
+      measurementId: "G-P4FXJC40KP"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const menuData = [
+      { id: "A", category: "套餐", name: "漢堡肉芝士蛋堡+紅茶", price: 70, available: true },
+      { id: "B", category: "套餐", name: "火腿芝士蛋吐司+紅茶", price: 60, available: true },
+      { id: "C", category: "套餐", name: "鮪魚芝士蛋堡+紅茶", price: 70, available: true },
+      { id: "1", category: "套餐", name: "檸檬雞蛋吐司+紅茶", price: 65, available: true },
+      { id: "2", category: "套餐", name: "火腿蛋潛艇堡+紅茶", price: 70, available: true },
+      { id: "3", category: "套餐", name: "香酥雞柳蛋堡+紅茶", price: 80, available: true },
+      { id: "4", category: "套餐", name: "勁辣雞腿蛋堡+紅茶", price: 85, available: true },
+      { id: "5", category: "套餐", name: "薯餅+熱狗*3+紅茶", price: 55, available: true },
+      { id: "6", category: "套餐", name: "鮪魚玉米芝士蛋餅+紅茶", price: 65, available: true },
+      { id: "7", category: "套餐", name: "火腿芝士河粉+紅茶", price: 55, available: true },
+      { id: "8", category: "套餐", name: "花枝/蝦排總匯+紅茶", price: 85, available: true }
+    ];
+    menuData.forEach(async item => {
+      try {
+        await db.collection("menu").doc(item.id).set(item);
+        console.log(`✅ 已匯入 ${item.id} - ${item.name}`);
+      } catch (e) {
+        console.error(`❌ 匯入失敗 ${item.id}`, e);
+      }
+    });
+  </script>
+</body>
+</html>
+
