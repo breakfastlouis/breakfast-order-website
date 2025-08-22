@@ -12,7 +12,12 @@
 </head>
 <body class="bg-blue-50">
   <div class="p-4 max-w-md mx-auto">
-    <h1 class="text-3xl font-extrabold text-blue-900 mb-6 text-center">路易士早餐吧</h1>
+    <h1 class="text-3xl font-extrabold text-blue-900 mb-4 text-center">路易士早餐吧</h1>
+
+    <!-- 分類切換按鈕列 -->
+    <div id="categoryBar" class="flex gap-2 mb-4 flex-wrap justify-center"></div>
+
+    <!-- 菜單區塊 -->
     <div id="menu" class="space-y-4"></div>
   </div>
 
@@ -30,9 +35,15 @@
       <ul id="cartList" class="mb-2"></ul>
       <input id="tableInput" type="text" placeholder="桌號（如 A1）"
         class="w-full mb-2 px-3 py-2 border rounded focus:outline-none focus:ring focus:border-blue-300" />
-      <div class="font-bold mb-2">總金額：NT$ <span id="cartTotal">0</span></div>
+
+      <!-- 總金額區塊 -->
+      <div class="bg-blue-100 p-3 rounded text-center mt-4">
+        <div class="text-sm text-blue-700">總金額</div>
+        <div class="text-2xl font-bold text-blue-900"><span id="cartTotal">0</span> 元</div>
+      </div>
+
       <button id="submitOrder"
-        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full">✅ 送出訂單</button>
+        class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full">✅ 送出訂單</button>
       <div id="orderMsg" class="mt-2 text-blue-700 font-semibold text-center hidden"></div>
     </div>
   </div>
@@ -41,10 +52,7 @@
     const firebaseConfig = {
       apiKey: "AIzaSyAEpf1ffQFht5yBm-xCBBMVsdxjzbVhsBg",
       authDomain: "louis-breakfast-tpe.firebaseapp.com",
-      projectId: "louis-breakfast-tpe",
-      storageBucket: "louis-breakfast-tpe.appspot.com",
-      messagingSenderId: "707080689547",
-      appId: "1:707080689547:web:ca293380046a59e7de818e"
+      projectId: "louis-breakfast-tpe"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
@@ -58,17 +66,42 @@
     const tableInput = document.getElementById("tableInput");
     const submitOrder = document.getElementById("submitOrder");
     const orderMsg = document.getElementById("orderMsg");
+    const categoryBar = document.getElementById("categoryBar");
 
     let cart = [];
+    let allMenu = [];
+    let currentCategory = "全部";
+
+    function renderCategoryBar(categories) {
+      categoryBar.innerHTML = "";
+      ["全部", ...categories].forEach(cat => {
+        const btn = document.createElement("button");
+        btn.textContent = cat;
+        btn.className = `px-3 py-1 rounded-full text-sm font-semibold ${
+          cat === currentCategory
+            ? "bg-blue-600 text-white"
+            : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+        }`;
+        btn.onclick = () => {
+          currentCategory = cat;
+          renderMenu(allMenu);
+          renderCategoryBar(categories);
+        };
+        categoryBar.appendChild(btn);
+      });
+    }
 
     function renderMenu(items) {
       menuEl.innerHTML = "";
-      items.forEach(item => {
+      const filtered = currentCategory === "全部"
+        ? items
+        : items.filter(item => item.category === currentCategory);
+      filtered.forEach(item => {
         const div = document.createElement("div");
         div.className = "bg-white p-4 rounded-lg shadow";
         div.innerHTML = `
           <div class="text-lg font-semibold text-gray-800">${item.id}. ${item.name}</div>
-          <div class="text-sm text-gray-500">NT$ ${item.price}</div>
+          <div class="text-xl font-bold text-blue-700 mt-1">NT$ ${item.price}</div>
           <button class="mt-3 bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded-full">加入購物車</button>
         `;
         div.querySelector("button").onclick = () => addToCart(item);
@@ -134,16 +167,4 @@
         cartOverlay.classList.add("hidden");
         orderMsg.textContent = `訂單已送出！編號：${orderId}，桌號：${tableNumber}`;
         orderMsg.classList.remove("hidden");
-      } catch (e) {
-        console.error("送出失敗", e);
-        alert("送出失敗，請稍後再試");
-      }
-    };
-
-    db.collection("menu").orderBy("id").onSnapshot(snap => {
-      const items = snap.docs.map(doc => doc.data()).filter(item => item.available !== false);
-      renderMenu(items);
-    });
-  </script>
-</body>
-</html>
+      } catch
