@@ -68,10 +68,8 @@
           return this.menu.slice().sort((a, b) => {
             const isANum = /^\d+$/.test(a.id);
             const isBNum = /^\d+$/.test(b.id);
-
             if (isANum && !isBNum) return 1;
             if (!isANum && isBNum) return -1;
-
             return a.id.localeCompare(b.id, 'zh-Hant', { numeric: true });
           });
         }
@@ -87,13 +85,26 @@
           console.log("訂單內容：", this.cart);
           this.orderSubmitted = true;
           this.cart = [];
+        },
+        parseCSV(csvText) {
+          const lines = csvText.trim().split('\n');
+          const headers = lines[0].split(',').map(h => h.trim());
+          const items = lines.slice(1).map(line => {
+            const values = line.split(',').map(v => v.trim());
+            const item = {};
+            headers.forEach((key, i) => {
+              item[key] = values[i];
+            });
+            return item;
+          });
+          return items;
         }
       },
       mounted() {
-        fetch("https://script.google.com/macros/s/AKfycbxW0AUm2IfUhM-bWT-SpcMezqtr-NS1l4omfCwT24-sGbIwmYDWdbu8J4NeAZogdDTN/exec")
-          .then(res => res.json())
-          .then(data => {
-            this.menu = data;
+        fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vQjGlrsEv20Fn9NPcVXq7oOzddPKjZkY95BAMEIxmo-frZkTDD7Bz4gojpCT-c-mRKg7E2cRKpE5iWt/pub?output=csv")
+          .then(res => res.text())
+          .then(csv => {
+            this.menu = this.parseCSV(csv);
             this.loading = false;
           })
           .catch(err => {
