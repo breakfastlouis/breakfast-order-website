@@ -53,7 +53,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, orderBy, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, query, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global variables provided by the Canvas environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -77,7 +77,10 @@
             'noOrders': '目前沒有任何訂單',
             'loadingOrders': '正在載入訂單...',
             'yourUserId': '您的使用者 ID：',
-            'copyId': '複製 ID'
+            'copyId': '複製 ID',
+            'orderDeleted': '訂單已刪除！',
+            'orderDeletedMsg': '該訂單已成功從列表中移除。',
+            'deleteConfirm': '確定要刪除此訂單嗎？'
         };
 
         /**
@@ -168,6 +171,49 @@
                 showMessage('複製失敗', '無法複製使用者 ID。請手動選取並複製。');
             }
         }
+        
+        /**
+         * Deletes an order from Firestore.
+         * @param {string} orderId The ID of the order to delete.
+         */
+        async function deleteOrder(orderId) {
+            // This is a custom modal confirmation, as window.confirm() might not work in some environments.
+            const userConfirmed = await new Promise(resolve => {
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 z-50 bg-gray-900 bg-opacity-75 flex items-center justify-center';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl shadow-xl p-6 m-4 max-w-sm w-full text-center">
+                        <h3 class="text-2xl font-bold mb-2">確認刪除</h3>
+                        <p class="text-gray-700 mb-4">${staticText.deleteConfirm}</p>
+                        <button id="confirm-delete" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg mr-2">刪除</button>
+                        <button id="cancel-delete" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">取消</button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+
+                document.getElementById('confirm-delete').onclick = () => {
+                    document.body.removeChild(modal);
+                    resolve(true);
+                };
+                document.getElementById('cancel-delete').onclick = () => {
+                    document.body.removeChild(modal);
+                    resolve(false);
+                };
+            });
+
+            if (!userConfirmed) {
+                return;
+            }
+
+            try {
+                const orderDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', orderId);
+                await deleteDoc(orderDocRef);
+                showMessage(staticText.orderDeleted, staticText.orderDeletedMsg);
+            } catch (error) {
+                console.error("Error deleting order:", error);
+                showMessage('刪除失敗', '無法刪除訂單，請稍後再試。');
+            }
+        }
 
         /**
          * Listens for real-time order updates from Firestore and renders them.
@@ -178,23 +224,16 @@
                 return;
             }
 
-            // Fix: The previous collection path was incorrect. It did not match the required
-            // format 'artifacts/{appId}/public/data/orders'.
-            // The new path has 5 segments, which is the correct format for a collection reference.
             const ordersCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
             
-            // Listen for real-time updates
             onSnapshot(ordersCollectionRef, (querySnapshot) => {
                 const orders = [];
                 querySnapshot.forEach((doc) => {
-                    // Get order data and add document ID
                     const orderData = doc.data();
                     orders.push({ id: doc.id, ...orderData });
                 });
 
-                // Sort orders by timestamp in descending order
                 orders.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
                 renderOrders(orders);
             }, (error) => {
                 console.error("Error listening to orders:", error);
@@ -220,13 +259,11 @@
             }
 
             orders.forEach(order => {
-                // Format the timestamp for better readability
                 const orderTime = new Date(order.timestamp).toLocaleString('zh-TW', {
                     hour: '2-digit', minute: '2-digit', second: '2-digit',
                     day: 'numeric', month: 'long', year: 'numeric'
                 });
 
-                // Generate HTML for each item in the order
                 const itemsHtml = order.items.map(item => `
                     <li class="flex justify-between items-center py-1">
                         <span class="text-gray-700">${item.name} <span class="text-sm text-gray-500">x ${item.quantity}</span></span>
@@ -245,6 +282,12 @@
                     <div class="flex justify-between items-center text-lg font-bold">
                         <span>總計：</span>
                         <span class="text-green-600">NT$ ${order.totalPrice}</span>
+                    </div>
+                    <!-- Add a delete button -->
+                    <div class="mt-4 text-right">
+                        <button onclick="deleteOrder('${order.id}')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                            <i class="fas fa-trash-alt mr-2"></i>刪除訂單
+                        </button>
                     </div>
                 `;
                 ordersContainerEl.appendChild(orderCard);
