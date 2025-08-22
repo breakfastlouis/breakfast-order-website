@@ -1,324 +1,181 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>訂單後台管理</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>路易士早餐吧 後台</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.15/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/vue-router@4"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4 md:p-8">
+<body class="bg-blue-50 font-sans">
+<div id="app" class="min-h-screen">
+  <header class="bg-blue-600 text-white p-4 flex items-center justify-between">
+    <h1 class="font-bold tracking-wide">路易士早餐吧 後台</h1>
+    <nav class="space-x-4 text-sm">
+      <router-link to="/menu" class="hover:underline">菜單管理</router-link>
+      <router-link to="/orders" class="hover:underline">訂單管理</router-link>
+    </nav>
+  </header>
+  <router-view></router-view>
+</div>
+<script>
+const db = firebase.firestore();
 
-    <div class="container mx-auto max-w-4xl w-full bg-white rounded-2xl shadow-xl p-6 md:p-8">
-
-        <!-- Header Section -->
-        <header class="flex justify-between items-center mb-6 border-b pb-4">
-            <h1 class="text-3xl md:text-4xl font-black text-blue-600">
-                訂單後台管理
-            </h1>
-            <div id="auth-status" class="text-sm text-gray-500 flex items-center space-x-2">
-                <i class="fas fa-spinner fa-spin text-blue-500"></i>
-                <span>驗證中...</span>
-            </div>
-        </header>
-        
-        <!-- Main Content -->
-        <main id="main-content">
-            <!-- Orders will be rendered here -->
-            <div id="orders-container" class="space-y-4">
-                <div class="text-center text-gray-500 py-10">
-                    <i class="fas fa-sync-alt fa-spin text-2xl mb-2"></i>
-                    <p>正在載入訂單...</p>
-                </div>
-            </div>
-        </main>
-
-    </div>
-
-    <!-- Message Modal -->
-    <div id="message-modal" class="fixed inset-0 z-50 bg-gray-900 bg-opacity-75 flex items-center justify-center hidden">
-        <div class="bg-white rounded-2xl shadow-xl p-6 m-4 max-w-sm w-full text-center">
-            <h3 id="message-title" class="text-2xl font-bold mb-2"></h3>
-            <p id="message-text" class="text-gray-700 mb-4"></p>
-            <button onclick="hideMessage()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">好的</button>
-        </div>
-    </div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // IMPORTANT: The following is your Firebase project config.
-        const firebaseConfig = {
-          apiKey: "AIzaSyB24oztV3Ljh2s2pPvDBv4z10WdP0N5Q2E",
-          authDomain: "fir-a2c0f.firebaseapp.com",
-          projectId: "fir-a2c0f",
-          storageBucket: "fir-a2c0f.firebasestorage.app",
-          messagingSenderId: "932859612366",
-          appId: "1:932859612366:web:74b0c71f1367018033149f"
-        };
-
-        const appId = firebaseConfig.projectId;
-
-        let db, auth;
-        let userId = null;
-
-        const authStatusEl = document.getElementById('auth-status');
-        const ordersContainerEl = document.getElementById('orders-container');
-        const messageModal = document.getElementById('message-modal');
-        const messageTitleEl = document.getElementById('message-title');
-        const messageTextEl = document.getElementById('message-text');
-
-        // All static text in Traditional Chinese
-        const staticText = {
-            'authenticating': '驗證中...',
-            'authSuccess': '驗證成功',
-            'authError': '驗證失敗',
-            'noOrders': '目前沒有任何訂單',
-            'loadingOrders': '正在載入訂單...',
-            'yourUserId': '您的使用者 ID：',
-            'copyId': '複製 ID',
-            'orderDeleted': '訂單已刪除！',
-            'orderDeletedMsg': '該訂單已成功從列表中移除。',
-            'deleteConfirm': '確定要刪除此訂單嗎？'
-        };
-
-        /**
-         * Displays a modal message to the user.
-         * @param {string} title The title of the message.
-         * @param {string} text The body of the message.
-         */
-        function showMessage(title, text) {
-            messageTitleEl.textContent = title;
-            messageTextEl.textContent = text;
-            messageModal.classList.remove('hidden');
-        }
-
-        /**
-         * Hides the modal message.
-         */
-        function hideMessage() {
-            messageModal.classList.add('hidden');
-        }
-
-        /**
-         * Initializes Firebase and sets up the authentication state listener.
-         */
-        function initializeFirebaseAndAuth() {
-            try {
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                
-                // Use onAuthStateChanged to ensure we get the user object after sign-in completes.
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        console.log("Firebase 驗證狀態已改變。使用者 ID:", userId);
-                        authStatusEl.innerHTML = `
-                            <i class="fas fa-check-circle text-green-500"></i>
-                            <span>${staticText.authSuccess}</span>
-                        `;
-                        // Display the user ID and a copy button
-                        const userIdEl = document.createElement('div');
-                        userIdEl.className = 'text-xs text-gray-500 mt-2 flex items-center space-x-2';
-                        userIdEl.innerHTML = `
-                            <span class="font-bold">${staticText.yourUserId}</span>
-                            <span id="user-id-text" class="select-all break-all">${userId}</span>
-                            <button onclick="copyUserId()" class="text-blue-500 hover:text-blue-700 focus:outline-none">
-                                <i class="fas fa-copy"></i>
-                            </button>
-                        `;
-                        document.getElementById('main-content').prepend(userIdEl);
-                        
-                        // Start listening for orders once authenticated
-                        startListeningForOrders();
-                    } else {
-                         // If no user is authenticated, sign in anonymously.
-                         console.log("尚未登入，正在進行匿名登入...");
-                         signInAnonymously(auth).then(() => {
-                             console.log("匿名登入成功。");
-                         }).catch((error) => {
-                            console.error("匿名登入失敗:", error);
-                            authStatusEl.innerHTML = `
-                                <i class="fas fa-times-circle text-red-500"></i>
-                                <span>${staticText.authError}</span>
-                            `;
-                            showMessage('驗證失敗', '無法連接到後台。請檢查您的網路連線或稍後再試。');
-                         });
-                    }
-                });
-
-            } catch (error) {
-                console.error("Firebase 初始化失敗:", error);
-                authStatusEl.innerHTML = `
-                    <i class="fas fa-times-circle text-red-500"></i>
-                    <span>${staticText.authError}</span>
-                `;
-                showMessage('驗證失敗', '無法連接到後台。請檢查您的網路連線或稍後再試。');
-            }
-        }
-
-        /**
-         * Copies the user ID to the clipboard.
-         */
-        function copyUserId() {
-            const userIdText = document.getElementById('user-id-text').innerText;
-            try {
-                // Use document.execCommand for better iFrame compatibility
-                const el = document.createElement('textarea');
-                el.value = userIdText;
-                document.body.appendChild(el);
-                el.select();
-                document.execCommand('copy');
-                document.body.removeChild(el);
-                showMessage('複製成功', '您的使用者 ID 已複製到剪貼簿。');
-            } catch (err) {
-                console.error('Failed to copy text: ', err);
-                showMessage('複製失敗', '無法複製使用者 ID。請手動選取並複製。');
-            }
-        }
-        
-        /**
-         * Deletes an order from Firestore.
-         * @param {string} orderId The ID of the order to delete.
-         */
-        async function deleteOrder(orderId) {
-            if (!db || !userId) {
-                console.error("Firestore not initialized or user not authenticated. Cannot delete order.");
-                showMessage('刪除失敗', '無法刪除訂單，請稍後再試。');
-                return;
-            }
-            
-            // This is a custom modal confirmation, as window.confirm() might not work in some environments.
-            const userConfirmed = await new Promise(resolve => {
-                const modal = document.createElement('div');
-                modal.className = 'fixed inset-0 z-50 bg-gray-900 bg-opacity-75 flex items-center justify-center';
-                modal.innerHTML = `
-                    <div class="bg-white rounded-2xl shadow-xl p-6 m-4 max-w-sm w-full text-center">
-                        <h3 class="text-2xl font-bold mb-2">確認刪除</h3>
-                        <p class="text-gray-700 mb-4">${staticText.deleteConfirm}</p>
-                        <button id="confirm-delete" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg mr-2">刪除</button>
-                        <button id="cancel-delete" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">取消</button>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-
-                document.getElementById('confirm-delete').onclick = () => {
-                    document.body.removeChild(modal);
-                    resolve(true);
-                };
-                document.getElementById('cancel-delete').onclick = () => {
-                    document.body.removeChild(modal);
-                    resolve(false);
-                };
-            });
-
-            if (!userConfirmed) {
-                return;
-            }
-
-            try {
-                const orderDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', orderId);
-                await deleteDoc(orderDocRef);
-                showMessage(staticText.orderDeleted, staticText.orderDeletedMsg);
-            } catch (error) {
-                console.error("Error deleting order:", error);
-                showMessage('刪除失敗', '無法刪除訂單，請稍後再試。');
-            }
-        }
-
-        /**
-         * Listens for real-time order updates from Firestore and renders them.
-         */
-        function startListeningForOrders() {
-            if (!db || !userId) {
-                console.error("Firestore not initialized or user not authenticated.");
-                return;
-            }
-
-            const ordersCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
-            
-            onSnapshot(ordersCollectionRef, (querySnapshot) => {
-                console.log("從 Firestore 接收到新的訂單資料。");
-                const orders = [];
-                querySnapshot.forEach((doc) => {
-                    const orderData = doc.data();
-                    orders.push({ id: doc.id, ...orderData });
-                });
-
-                orders.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                renderOrders(orders);
-            }, (error) => {
-                console.error("Error listening to orders:", error);
-                ordersContainerEl.innerHTML = `<p class="text-center text-red-500 py-10">載入訂單失敗。</p>`;
-            });
-        }
-
-        /**
-         * Renders the list of orders to the dashboard.
-         * @param {Array} orders The array of order objects.
-         */
-        function renderOrders(orders) {
-            ordersContainerEl.innerHTML = ''; // Clear previous orders
-
-            if (orders.length === 0) {
-                ordersContainerEl.innerHTML = `
-                    <div class="text-center text-gray-500 py-10">
-                        <i class="fas fa-box-open text-4xl mb-2"></i>
-                        <p>${staticText.noOrders}</p>
-                    </div>
-                `;
-                return;
-            }
-
-            orders.forEach(order => {
-                const orderTime = new Date(order.timestamp).toLocaleString('zh-TW', {
-                    hour: '2-digit', minute: '2-digit', second: '2-digit',
-                    day: 'numeric', month: 'long', year: 'numeric'
-                });
-
-                const itemsHtml = order.items.map(item => `
-                    <li class="flex justify-between items-center py-1">
-                        <span class="text-gray-700">${item.name} <span class="text-sm text-gray-500">x ${item.quantity}</span></span>
-                        <span class="text-gray-700 font-medium">NT$ ${item.quantity * item.price}</span>
-                    </li>
-                `).join('');
-
-                const orderCard = document.createElement('div');
-                orderCard.className = 'bg-gray-50 p-6 rounded-2xl shadow-sm border border-gray-200';
-                orderCard.innerHTML = `
-                    <div class="flex justify-between items-center mb-4 border-b pb-2">
-                        <h3 class="text-xl font-bold text-gray-800">${order.customerName || '匿名顧客'}</h3>
-                        <span class="text-sm text-gray-500">${orderTime}</span>
-                    </div>
-                    <ul class="space-y-2 mb-4">${itemsHtml}</ul>
-                    <div class="flex justify-between items-center text-lg font-bold">
-                        <span>總計：</span>
-                        <span class="text-green-600">NT$ ${order.totalPrice}</span>
-                    </div>
-                    <!-- Add a delete button -->
-                    <div class="mt-4 text-right">
-                        <button onclick="deleteOrder('${order.id}')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                            <i class="fas fa-trash-alt mr-2"></i>刪除訂單
-                        </button>
-                    </div>
-                `;
-                ordersContainerEl.appendChild(orderCard);
-            });
-        }
-
-        // Initial setup
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeFirebaseAndAuth();
+// 菜單管理模組
+const MenuManager = {
+  data() {
+    return {
+      menu: [],
+      loading: true,
+      form: { id: "", name: "", price: "", category: "", available: true },
+      editingId: null,
+      editRow: {}
+    };
+  },
+  mounted() {
+    db.collection("menu").orderBy("id").onSnapshot(snap => {
+      this.menu = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+      this.loading = false;
+    });
+  },
+  methods: {
+    async addItem() {
+      const { id, name, price, category, available } = this.form;
+      if (!id || !name || price === "") return alert("請填寫完整資料");
+      try {
+        await db.collection("menu").doc(id).set({
+          id, name, price: Number(price), category, available
         });
-    </script>
+        this.form = { id: "", name: "", price: "", category: "", available: true };
+      } catch (e) {
+        console.error(e); alert("新增失敗");
+      }
+    },
+    startEdit(item) {
+      this.editingId = item.docId;
+      this.editRow = { ...item };
+    },
+    async saveEdit() {
+      try {
+        await db.collection("menu").doc(this.editingId).update({
+          name: this.editRow.name,
+          price: Number(this.editRow.price),
+          category: this.editRow.category,
+          available: this.editRow.available
+        });
+        this.editingId = null;
+      } catch (e) {
+        console.error(e); alert("更新失敗");
+      }
+    },
+    async remove(item) {
+      if (!confirm(`確定刪除「${item.name}」？`)) return;
+      try {
+        await db.collection("menu").doc(item.docId).delete();
+      } catch (e) {
+        console.error(e); alert("刪除失敗");
+      }
+    }
+  },
+  template: `
+    <div class="p-4 max-w-4xl mx-auto">
+      <h2 class="text-xl font-bold mb-4">菜單管理</h2>
+
+      <div class="bg-white p-4 rounded shadow mb-6">
+        <div class="grid grid-cols-5 gap-3">
+          <input v-model="form.id" placeholder="ID" class="border p-2 rounded"/>
+          // 訂單管理模組
+const OrdersManager = {
+  data() {
+    return {
+      orders: [],
+      loading: true,
+      filter: "全部"
+    };
+  },
+  computed: {
+    filteredOrders() {
+      if (this.filter === "全部") return this.orders;
+      return this.orders.filter(o => o.status === this.filter);
+    }
+  },
+  mounted() {
+    db.collection("orders").orderBy("createdAt", "desc").onSnapshot(snap => {
+      this.orders = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+      this.loading = false;
+    });
+  },
+  methods: {
+    async updateStatus(order, status) {
+      try {
+        await db.collection("orders").doc(order.docId).update({ status });
+      } catch (e) {
+        console.error(e); alert("更新失敗");
+      }
+    },
+    format(ts) {
+      if (!ts) return "-";
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+  },
+  template: `
+    <div class="p-4 max-w-5xl mx-auto">
+      <h2 class="text-xl font-bold mb-4">訂單管理</h2>
+
+      <div class="mb-4 space-x-2">
+        <button @click="filter='全部'" :class="filter==='全部' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800'" class="px-3 py-1 rounded">全部</button>
+        <button @click="filter='處理中'" :class="filter==='處理中' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800'" class="px-3 py-1 rounded">處理中</button>
+        <button @click="filter='已完成'" :class="filter==='已完成' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800'" class="px-3 py-1 rounded">已完成</button>
+      </div>
+
+      <div v-if="loading">訂單載入中...</div>
+
+      <div v-for="order in filteredOrders" :key="order.docId" class="bg-white rounded shadow p-4 mb-3">
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="font-semibold">編號：{{ order.orderId }}</div>
+            <div>桌號：{{ order.tableNumber }}</div>
+            <div>時間：{{ format(order.createdAt) }}</div>
+          </div>
+          <div class="space-x-2">
+            <span class="text-xs px-2 py-1 rounded" :class="order.status==='已完成' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'">
+              {{ order.status || '處理中' }}
+            </span>
+            <button @click="updateStatus(order, '處理中')" class="bg-yellow-500 text-white px-2 py-1 rounded">處理中</button>
+            <button @click="updateStatus(order, '已完成')" class="bg-green-600 text-white px-2 py-1 rounded">完成</button>
+          </div>
+        </div>
+
+        <div class="mt-3 border-t pt-3">
+          <div class="font-semibold mb-2">品項</div>
+          <ul class="list-disc ml-5">
+            <li v-for="(item, idx) in order.items" :key="idx">
+              {{ item.id }}. {{ item.name }} x{{ item.qty }} - NT$ {{ item.price }}
+            </li>
+          </ul>
+          <div class="mt-2 font-bold">總金額：NT$ {{ order.total }}</div>
+        </div>
+      </div>
+    </div>
+  `
+};
+
+// Vue Router 註冊
+const routes = [
+  { path: '/', redirect: '/menu' },
+  { path: '/menu', component: MenuManager },
+  { path: '/orders', component: OrdersManager }
+];
+const router = VueRouter.createRouter({
+  history: VueRouter.createWebHashHistory(),
+  routes
+});
+
+Vue.createApp({}).use(router).mount('#app');
+</script>
 </body>
 </html>
