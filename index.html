@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>路易士早餐吧</title>
   <script src="https://cdn.jsdelivr.net/npm/vue@3.4.15/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC&display=swap" rel="stylesheet">
   <style>body { font-family: 'Noto Sans TC', sans-serif; }</style>
 </head>
@@ -17,10 +17,9 @@
       路易士早餐吧
     </h1>
 
-    <div v-if="loading" class="text-center text-gray-600">🍳 菜單載入中...</div>
-    <div v-if="error" class="text-center text-red-600 font-semibold">⚠️ 菜單載入失敗，請稍後再試</div>
+    <div v-if="loading">🍳 菜單載入中...</div>
 
-    <div v-if="!loading && !error">
+    <div v-else>
       <div v-for="item in sortedMenu" :key="item.id" class="bg-white p-4 mb-4 rounded-lg shadow hover:shadow-lg transition">
         <div class="text-lg font-semibold text-gray-800">{{ item.id }}. {{ item.name }}</div>
         <div class="text-sm text-gray-500">NT$ {{ item.price }}</div>
@@ -30,46 +29,51 @@
       </div>
     </div>
 
+    <!-- 懸浮式購物車面板 -->
+    <div v-if="showCartPanel"
+      class="fixed bottom-24 right-6 w-80 bg-white shadow-xl rounded-lg p-4 z-50 transition">
+      <h2 class="text-xl font-bold mb-2">🛒 購物車</h2>
+      <div v-if="cart.length === 0">目前尚未選擇品項</div>
+      <ul>
+        <li v-for="(item, index) in cart" :key="index" class="mb-2">
+          {{ item.id }}. {{ item.name }} - NT$ {{ item.price }}
+          <button @click="removeFromCart(index)" class="ml-2 text-red-500">移除</button>
+        </li>
+      </ul>
+
+      <!-- 桌號輸入欄位 -->
+      <div class="mt-4">
+        <label for="table" class="block text-sm font-medium text-gray-700">桌號</label>
+        <input id="table" v-model="tableNumber" type="text"
+          placeholder="例如：A1、5號桌"
+          class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+      </div>
+
+      <div class="mt-2 font-bold">總金額：NT$ {{ total }}</div>
+      <button @click="submitOrder"
+        class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded w-full">
+        ✅ 送出訂單
+      </button>
+    </div>
+
     <!-- 購物車浮動按鈕 -->
     <button @click="toggleCartPanel"
-      class="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg transition z-50 relative"
+      class="fixed bottom-6 right-6 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition z-50 relative"
       aria-label="購物車">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
+      <svg v-if="cart.length === 0" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round"
           d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.6 8h13.2M7 13L5.4 5M9 21a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" />
+      </svg>
+      <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor"
+        viewBox="0 0 24 24">
+        <path d="M7 4h-2l-1 2h2l1-2zm1 2h10l4 8H7l1-8zm0 10h10v2H8v-2zm1 4a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z"/>
       </svg>
       <span v-if="cart.length > 0"
         class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1">
         {{ cart.length }}
       </span>
     </button>
-
-    <!-- 右側懸浮購物車面板（手機也支援） -->
-    <div v-if="showCartPanel"
-      class="fixed bottom-20 right-4 w-[90vw] max-w-sm bg-white shadow-xl rounded-lg p-4 z-50 transition overflow-y-auto max-h-[70vh] border border-blue-200">
-      <h2 class="text-xl font-bold mb-2">🛒 購物車</h2>
-      <div v-if="cart.length === 0" class="text-gray-500">目前尚未選擇品項</div>
-      <ul>
-        <li v-for="(item, index) in cart" :key="index" class="mb-2 flex justify-between items-center">
-          <span>{{ item.id }}. {{ item.name }} - NT$ {{ item.price }}</span>
-          <button @click="removeFromCart(index)" class="text-red-500 text-sm">移除</button>
-        </li>
-      </ul>
-
-      <div class="mt-4">
-        <label for="table" class="block text-sm font-medium text-gray-700">桌號</label>
-        <input id="table" v-model="tableNumber" type="text"
-          placeholder="例如：5號桌"
-          class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-      </div>
-
-      <div class="mt-2 font-bold">總金額：NT$ {{ total }}</div>
-      <button @click="submitOrder"
-        class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full">
-        ✅ 送出訂單
-      </button>
-    </div>
 
     <!-- 訂單送出後提示 -->
     <div v-if="orderSubmitted" class="mt-6 text-blue-700 font-semibold text-center">
@@ -78,6 +82,7 @@
   </div>
 
   <script>
+    // Firebase 初始化
     const firebaseConfig = {
       apiKey: "AIzaSyAEpf1ffQFht5yBm-xCBBMVsdxjzbVhsBg",
       authDomain: "louis-breakfast-tpe.firebaseapp.com",
@@ -103,8 +108,7 @@
           orderCounter: 1,
           showCartPanel: false,
           orderSubmitted: false,
-          loading: true,
-          error: false
+          loading: true
         };
       },
       computed: {
@@ -127,36 +131,19 @@
         toggleCartPanel() {
           this.showCartPanel = !this.showCartPanel;
         },
-        async submitOrder() {
+        submitOrder() {
           const today = new Date();
           const yyyy = today.getFullYear();
           const mm = String(today.getMonth() + 1).padStart(2, '0');
           const dd = String(today.getDate()).padStart(2, '0');
           const dateStr = `${yyyy}${mm}${dd}`;
           const serial = String(this.orderCounter).padStart(4, '0');
-          const orderId = `${dateStr}${serial}`;
+          this.lastOrderId = `${dateStr}${serial}`;
+          this.lastTableNumber = this.tableNumber;
 
-          const payload = {
-            orderId,
-            tableNumber: this.tableNumber,
-            items: this.cart.map(item => ({
-              id: item.id,
-              name: item.name,
-              price: item.price,
-              qty: 1
-            })),
-            total: this.total,
-            status: "處理中",
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-          };
+          console.log("訂單編號：", this.lastOrderId);
+          console.log("桌號：", this.lastTableNumber);
+          console.log("訂單內容：", this.cart);
 
-          try {
-            await db.collection("orders").add(payload);
-            this.lastOrderId = orderId;
-            this.lastTableNumber = this.tableNumber;
-            this.orderCounter++;
-            this.cart = [];
-            this.tableNumber = '';
-            this.orderSubmitted = true;
-            this.show
-
+          this.orderCounter++;
+         
