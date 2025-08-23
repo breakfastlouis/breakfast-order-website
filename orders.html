@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>路易士早餐吧｜訂單管理</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.15/dist/vue.global.prod.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -10,131 +11,91 @@
   <style>body { font-family: 'Noto Sans TC', sans-serif; }</style>
 </head>
 <body class="bg-gray-50">
-  <div class="p-6 max-w-3xl mx-auto">
+  <div id="app" class="p-6 max-w-3xl mx-auto">
     <h1 class="text-3xl font-bold text-blue-900 mb-6 text-center">📦 路易士早餐吧｜訂單管理</h1>
 
-    <div class="mb-4 flex flex-col md:flex-row gap-2">
-      <input id="searchInput" placeholder="搜尋桌號或訂單編號"
-        class="px-3 py-2 border rounded w-full md:w-1/2" />
-      <select id="statusFilter" class="px-3 py-2 border rounded w-full md:w-1/2">
-        <option value="all">全部</option>
-        <option value="pending">未完成</option>
-      </select>
-    </div>
-
-    <div id="stats" class="mb-4 bg-blue-50 p-4 rounded shadow text-sm text-gray-700 hidden"></div>
-
-    <button onclick="window.print()"
-      class="mb-4 bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded">
-      🖨️ 列印報表
-    </button>
-
-    <ul id="orderList"></ul>
-  </div>
-
+    <div v-if="orders.length === 0" class="text-center text-gray-500">目前尚無訂單</div>
+    <ul>
+      <li v-for="order in sortedOrders" :key="order.orderId"
+        class="bg-white p-4 mb-4 rounded shadow">
+        <div class="font-bold text-blue-800">訂單編號：{{ order.orderId }}</div>
+        <div class="text-sm text-gray-600">桌號：{{ order.tableNumber }}</div>
+        <div class="text-sm text-gray-600">總金額：NT$ {{ order.total }}</div>
+        <div class="text-sm text-gray-600">狀態：{{ order.status }}</div>
+        <div class="text-sm text-gray-400">時間：{{ formatTimestamp(order.createdAt) }}</div>
+        <div class="mt-2 space-x-2">
+          <button v-if="order.status !== '完成'" @click="markOrderComplete(order)"
+            class="text-sm bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded">
+            標記為完成
+          </button>
+          <button @click="deleteOrder(order)"
+            class="text-sm bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded">
+            刪除訂單
+          </button>
+        </div>
+      </li>
+    </ul>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAEpf1ffQFht5yBm-xCBBMVsdxjzbVhsBg",
       authDomain: "louis-breakfast-tpe.firebaseapp.com",
-      projectId: "louis-breakfast-tpe"
+      projectId: "louis-breakfast-tpe",
+      storageBucket: "louis-breakfast-tpe.appspot.com",
+      messagingSenderId: "707080689547",
+      appId: "1:707080689547:web:ca293380046a59e7de818e",
+      measurementId: "G-P4FXJC40KP"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    const orderList = document.getElementById("orderList");
-    const searchInput = document.getElementById("searchInput");
-    const statusFilter = document.getElementById("statusFilter");
-    const statsBox = document.getElementById("stats");
+    const { createApp } = Vue;
 
-    let orders = [];
-
-    function formatTime(ts) {
-      if (!ts?.seconds) return "無時間資料";
-      const date = new Date(ts.seconds * 1000);
-      return date.toLocaleString("zh-TW", {
-        year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit"
-      });
-    }
-
-    function renderStats(filtered) {
-      const today = new Date().toISOString().slice(0, 10);
-      const todayOrders = filtered.filter(o => {
-        const ts = o.createdAt?.seconds;
-        if (!ts) return false;
-        const d = new Date(ts * 1000).toISOString().slice(0, 10);
-        return d === today;
-      });
-      const total = todayOrders.reduce((sum, o) => sum + Number(o.total), 0);
-      const avg = todayOrders.length ? Math.round(total / todayOrders.length) : 0;
-      statsBox.innerHTML = `
-        <div class="font-bold text-blue-800 mb-2">📊 今日銷售統計</div>
-        <div>訂單數：${todayOrders.length}</div>
-        <div>總金額：NT$ ${total}</div>
-        <div>平均金額：NT$ ${avg}</div>
-      `;
-      statsBox.classList.remove("hidden");
-    }
-
-    function renderOrders() {
-      const query = searchInput.value.trim();
-      const filter = statusFilter.value;
-      const filtered = orders.filter(order => {
-        const matchSearch = order.orderId.includes(query) || order.tableNumber.includes(query);
-        const matchStatus = filter === "all" || order.status !== "完成";
-        return matchSearch && matchStatus;
-      }).sort((a, b) => {
-        const ta = a.createdAt?.seconds || 0;
-        const tb = b.createdAt?.seconds || 0;
-        return tb - ta;
-      });
-
-      renderStats(filtered);
-
-      orderList.innerHTML = "";
-      filtered.forEach(order => {
-        const li = document.createElement("li");
-        li.className = "bg-white p-4 mb-4 rounded shadow text-sm";
-        li.innerHTML = `
-          <div class="font-bold text-blue-800">訂單編號：${order.orderId}</div>
-          <div class="text-gray-600">桌號：${order.tableNumber}</div>
-          <div class="text-gray-600">狀態：${order.status}</div>
-          <div class="text-gray-400">時間：${formatTime(order.createdAt)}</div>
-          <div class="mt-2 text-gray-700">
-            <div class="font-semibold mb-1">品項：</div>
-            <ul class="list-disc pl-5">
-              ${order.items?.map(i => `<li>${i.name} - NT$ ${i.price}</li>`).join("") || "<li class='text-red-500'>⚠️ 無品項資料</li>"}
-            </ul>
-          </div>
-          <div class="mt-2 font-bold text-blue-700">總金額：NT$ ${order.total}</div>
-          <div class="mt-2 space-x-2">
-            ${order.status !== "完成" ? `<button class="bg-green-500 text-white px-2 py-1 rounded" onclick="markComplete('${order._docId}')">標記為完成</button>` : ""}
-            <button class="bg-red-500 text-white px-2 py-1 rounded" onclick="deleteOrder('${order._docId}')">刪除訂單</button>
-          </div>
-        `;
-        orderList.appendChild(li);
-      });
-    }
-
-    function markComplete(id) {
-      db.collection("orders").doc(id).update({ status: "完成" });
-    }
-
-    function deleteOrder(id) {
-      db.collection("orders").doc(id).delete();
-    }
-
-    searchInput.oninput = renderOrders;
-    statusFilter.onchange = renderOrders;
-
-    db.collection("orders").onSnapshot(snap => {
-      orders = snap.docs.map(doc => {
-        const data = doc.data();
-        data._docId = doc.id;
-        return data;
-      });
-      renderOrders();
-    });
+    createApp({
+      data() {
+        return {
+          orders: []
+        };
+      },
+      computed: {
+        sortedOrders() {
+          return this.orders.slice().sort((a, b) => {
+            const ta = a.createdAt?.seconds || 0;
+            const tb = b.createdAt?.seconds || 0;
+            return tb - ta;
+          });
+        }
+      },
+      methods: {
+        markOrderComplete(order) {
+          db.collection("orders").doc(order._docId).update({
+            status: "完成"
+          });
+        },
+        deleteOrder(order) {
+          db.collection("orders").doc(order._docId).delete();
+        },
+        formatTimestamp(ts) {
+          if (!ts?.seconds) return "無時間資料";
+          const date = new Date(ts.seconds * 1000);
+          return date.toLocaleString("zh-TW", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+          });
+        }
+      },
+      mounted() {
+        db.collection("orders").onSnapshot(snap => {
+          this.orders = snap.docs.map(doc => {
+            const data = doc.data();
+            data._docId = doc.id;
+            return data;
+          });
+        });
+      }
+    }).mount("#app");
   </script>
 </body>
 </html>
